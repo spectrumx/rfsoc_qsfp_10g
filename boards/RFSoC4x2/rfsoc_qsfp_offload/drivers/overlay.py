@@ -71,7 +71,9 @@ class Overlay (Overlay):
     def enable_udp(self, state):
         """ Enable (True) or Disable (False) the UDP packet generator
         """
-        if(state):
+        if(state): 
+            # 128 * 64 bytes = 8192 bytes to be sent
+            self.adc_packet_generator.packet_generator.packetsize = 128
             self.adc_packet_generator.packet_generator.enable()
         else:
             self.adc_packet_generator.packet_generator.disable()
@@ -88,7 +90,6 @@ class Overlay (Overlay):
         self.enable_udp(True)
         return sample_rate
 
-
     def set_fc(self, tile, block, fc):
         """ Change the center frequency.
         """
@@ -99,5 +100,5 @@ class Overlay (Overlay):
     def adc_select(self, adc_sel):
         # 0 = ADC B
         # 1 = ADC A
-        self.netlayer_switch.write(0x40, adc_sel)
-        self.netlayer_switch.write(0x00, 0x02)
+        self.adc_packet_generator.netlayer_switch.write(0x40, adc_sel)
+        self.adc_packet_generator.netlayer_switch.write(0x00, 0x02)

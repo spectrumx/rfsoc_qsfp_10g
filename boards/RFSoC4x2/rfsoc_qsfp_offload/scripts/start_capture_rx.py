@@ -13,16 +13,25 @@ def signal_handler(sig, frame):
     exit_flag = True
     
 def main(args):
-    f_c = args.freq
     
+    # Correct for ADC ordering
+    if(args.channel == 0):
+        adc_block = 1
+    elif(args.channel == 1):
+        adc_block = 0
+    else:
+        print("Invalid ADC Channel")
+        return
+
     f_c = args.freq
-    print("Starting RF capture at %fMHz" % (f_c))
+    print("Starting RF capture on ADC%d at %0.3fMHz" % (args.channel, f_c))
 
     board_ip = '192.168.4.99'
     client_ip = '192.168.4.1'
 
     print("Initializing RFSoC QSFP Offload Overlay")
-    ol = Overlay(ignore_version=True)
+    #ol = Overlay(ignore_version=True)
+    ol = Overlay(bitfile_name="../bitstream/rfsoc_offload_10g.bit", ignore_version=True)
     # Wait for overlay to initialize
     ol.cmac.mmio.write(0x107C, 0x3) # RSFEC_CONFIG_ENABLE
     ol.cmac.mmio.write(0x1000, 0x7) # RSFEC_CONFIG_INDICATION_CORRECTION
@@ -35,30 +44,28 @@ def main(args):
 
     ol.netlayer.sockets[0] = (client_ip, 60133, 60133, True)
     ol.netlayer.populate_socket_table()
-    ol.source_select(1) # Select RF-ADC source for packets
+    ol.adc_select(adc_block) # Select RF-ADC source for packets
 
     ADC_TILE = 2       # ADC Tile 226
-    ADC_BLOCK = 0       # ADC Block 0
     ADC_SAMPLE_FREQUENCY = 1024  # MSps
     ADC_PLL_FREQUENCY    = 491.52   # MHz
     ADC_FC = -1*f_c # Tune to center frequency
 
-    # Stop if running
-    ol.packet_generator.disable()
+    # Stop UDP stream if running
+    ol.enable_udp(False)
 
     # Start ADC
     ol.initialise_adc(tile=ADC_TILE,
-                    block=ADC_BLOCK,
+                    block=adc_block,
                     pll_freq=ADC_PLL_FREQUENCY,
                     fs=ADC_SAMPLE_FREQUENCY,
                     fc=ADC_FC)
 
     # Decimate by (16x)
-    ol.set_decimation(tile=ADC_TILE,block=ADC_BLOCK,sample_rate=64e6)
+    ol.set_decimation(tile=ADC_TILE,block=adc_block,sample_rate=64e6)
 
     # Set packet size
-    ol.packet_generator.packetsize = 128 # 128 * 64 bytes = 8192 bytes to be sent
-    ol.packet_generator.enable()
+    ol.enable_udp(True)
 
     print("Starting UDP stream")
     print("Ctrl-C to exit")
@@ -67,7 +74,7 @@ def main(args):
         print(".", end='', flush=True)
 
     # Stop packet generator
-    ol.packet_generator.disable()
+    ol.enable_udp(False)
 
 if __name__ == "__main__":
     # CTRL-C handler
@@ -81,6 +88,8 @@ if __name__ == "__main__":
         )
     parser.add_argument('-f', '--freq',type=float,help='Center frequency (MHz)',
                         default = '1000')
+    parser.add_argument('-c', '--channel',type=int,help='ADC Channel',
+                        default = '0')
                         
     args = parser.parse_args()
     main(args)
