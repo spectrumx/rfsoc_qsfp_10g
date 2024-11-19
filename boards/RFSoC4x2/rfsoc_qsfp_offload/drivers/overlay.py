@@ -68,16 +68,26 @@ class Overlay (Overlay):
         self.rfdc.dac_tiles[tile].blocks[block].MixerSettings['EventSource'] = xrfdc.EVNT_SRC_IMMEDIATE
         self.rfdc.dac_tiles[tile].SetupFIFO(True)
 
+    def enable_udp(self, state):
+        """ Enable (True) or Disable (False) the UDP packet generator
+        """
+        if(state): 
+            # 128 * 64 bytes = 8192 bytes to be sent
+            self.adc_packet_generator.packet_generator.packetsize = 128
+            self.adc_packet_generator.packet_generator.enable()
+        else:
+            self.adc_packet_generator.packet_generator.disable()
+
     def set_decimation(self, tile, block, sample_rate):
         """ Set the sampling rate by changing decimation factor and FabClkDiv.
         """
         decimation_factor, fab_clk_div = fs2div[str(sample_rate)]
-        self.packet_generator.disable()
+        self.enable_udp(False)
         self.rfdc.adc_tiles[tile].ShutDown()
         self.rfdc.adc_tiles[tile].FabClkOutDiv = fab_clk_div
         self.rfdc.adc_tiles[tile].blocks[block].DecimationFactor = decimation_factor
         self.rfdc.adc_tiles[tile].StartUp()
-        self.packet_generator.enable()
+        self.enable_udp(True)
         return sample_rate
 
     def set_fc(self, tile, block, fc):
@@ -87,8 +97,8 @@ class Overlay (Overlay):
         self.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
         return fc
 
-    def source_select(self, source):
-        # 0 = DMA
-        # 1 = RF-ADC
-        self.netlayer_switch.write(0x40, source)
-        self.netlayer_switch.write(0x00, 0x02)
+    def adc_select(self, adc_sel):
+        # 0 = ADC B
+        # 1 = ADC A
+        self.adc_packet_generator.netlayer_switch.write(0x40, adc_sel)
+        self.adc_packet_generator.netlayer_switch.write(0x00, 0x02)
