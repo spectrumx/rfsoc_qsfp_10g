@@ -72,12 +72,12 @@ class Overlay (Overlay):
         """ Set the sampling rate by changing decimation factor and FabClkDiv.
         """
         decimation_factor, fab_clk_div = fs2div[str(sample_rate)]
-        self.packet_generator.disable()
+        self.rx_channel.packet_generator.disable()
         self.rfdc.adc_tiles[tile].ShutDown()
         self.rfdc.adc_tiles[tile].FabClkOutDiv = fab_clk_div
         self.rfdc.adc_tiles[tile].blocks[block].DecimationFactor = decimation_factor
         self.rfdc.adc_tiles[tile].StartUp()
-        self.packet_generator.enable()
+        self.rx_channel.packet_generator.enable()
         return sample_rate
 
     def set_fc(self, tile, block, fc):
