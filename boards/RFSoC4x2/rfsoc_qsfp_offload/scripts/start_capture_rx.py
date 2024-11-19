@@ -31,7 +31,7 @@ def main(args):
 
     print("Initializing RFSoC QSFP Offload Overlay")
     #ol = Overlay(ignore_version=True)
-    ol = Overlay(bitfile_name="../bitstream/rfsoc_offload_10g.bit", ignore_version=True)
+    ol = Overlay(bitfile_name="/opt/git/rfsoc_qsfp_10g/boards/RFSoC4x2/rfsoc_qsfp_offload/bitstream/rfsoc_offload_10g.bit", ignore_version=True)
     # Wait for overlay to initialize
     ol.cmac.mmio.write(0x107C, 0x3) # RSFEC_CONFIG_ENABLE
     ol.cmac.mmio.write(0x1000, 0x7) # RSFEC_CONFIG_INDICATION_CORRECTION
