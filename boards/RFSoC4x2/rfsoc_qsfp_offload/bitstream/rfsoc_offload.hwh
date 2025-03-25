@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Sun Mar 23 19:55:41 2025" VIVADOVERSION="2021.1">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Mon Mar 24 16:12:42 2025" VIVADOVERSION="2021.1">
 
   <SYSTEMINFO ARCH="zynquplusRFSOC" BOARD="realdigital.org:rfsoc4x2:part0:1.0" DEVICE="xczu48dr" NAME="block_design" PACKAGE="ffvg1517" SPEEDGRADE="-2"/>
 
@@ -6987,57 +6987,57 @@
         </PORT>
         <PORT DIR="I" NAME="s_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tvalid"/>
+            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tvalid"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tready"/>
+            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tready"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" LEFT="511" NAME="s_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tdata"/>
+            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tdata"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" LEFT="63" NAME="s_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tkeep"/>
+            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tkeep"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="s_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tlast"/>
+            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tlast"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" NAME="m_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tvalid_0"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="m_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tready_0"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tready"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="63" NAME="m_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tdata_0"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="7" NAME="m_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tkeep_0"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" NAME="m_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tlast_0"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
       </PORTS>
       <BUSINTERFACES>
-        <BUSINTERFACE BUSNAME="tx_fifo_M_AXIS" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
+        <BUSINTERFACE BUSNAME="netlayer_M_AXIS_nl2eth" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
           <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
@@ -7111,65 +7111,69 @@
         <PARAMETER NAME="EDK_IPTYPE" VALUE="BUS"/>
       </PARAMETERS>
       <PORTS>
-        <PORT CLKFREQUENCY="156250000" DIR="I" NAME="aclk" SIGIS="clk" SIGNAME="xxv_ethernet_0_rx_clk_out_0">
+        <PORT CLKFREQUENCY="156250000" DIR="I" NAME="aclk" SIGIS="clk" SIGNAME="xxv_ethernet_0_tx_clk_out_0">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_clk_out_0"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_clk_out_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="aresetn" POLARITY="ACTIVE_LOW" SIGIS="rst" SIGNAME="util_vector_logic_0_Res">
+        <PORT DIR="I" NAME="aresetn" POLARITY="ACTIVE_LOW" SIGIS="rst" SIGNAME="rst_ps8_0_gt_tx_peripheral_aresetn">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="util_vector_logic_0" PORT="Res"/>
+            <CONNECTION INSTANCE="rst_ps8_0_gt_tx" PORT="peripheral_aresetn"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="s_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tvalid_0"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef"/>
+        <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tready">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tready"/>
+          </CONNECTIONS>
+        </PORT>
         <PORT DIR="I" LEFT="63" NAME="s_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tdata_0"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" LEFT="7" NAME="s_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tkeep_0"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="s_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tlast_0"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" NAME="m_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tvalid"/>
+            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tvalid"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="m_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tready"/>
+            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tready"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="511" NAME="m_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tdata"/>
+            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tdata"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="63" NAME="m_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tkeep"/>
+            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tkeep"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" NAME="m_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tlast"/>
+            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tlast"/>
           </CONNECTIONS>
         </PORT>
       </PORTS>
       <BUSINTERFACES>
-        <BUSINTERFACE BUSNAME="xxv_ethernet_0_axis_rx_0" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
+        <BUSINTERFACE BUSNAME="rx_fifo_M_AXIS" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
           <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
@@ -7180,7 +7184,7 @@
           <PARAMETER NAME="HAS_TLAST" VALUE="1"/>
           <PARAMETER NAME="FREQ_HZ" VALUE="156250000"/>
           <PARAMETER NAME="PHASE" VALUE="0"/>
-          <PARAMETER NAME="CLK_DOMAIN" VALUE="block_design_xxv_ethernet_0_0_rx_clk_out_0"/>
+          <PARAMETER NAME="CLK_DOMAIN" VALUE="block_design_xxv_ethernet_0_0_tx_clk_out_0"/>
           <PARAMETER NAME="LAYERED_METADATA" VALUE="undef"/>
           <PARAMETER NAME="INSERT_VIP" VALUE="0"/>
           <PORTMAPS>
@@ -7202,7 +7206,7 @@
           <PARAMETER NAME="HAS_TLAST" VALUE="1"/>
           <PARAMETER NAME="FREQ_HZ" VALUE="156250000"/>
           <PARAMETER NAME="PHASE" VALUE="0"/>
-          <PARAMETER NAME="CLK_DOMAIN" VALUE="block_design_xxv_ethernet_0_0_rx_clk_out_0"/>
+          <PARAMETER NAME="CLK_DOMAIN" VALUE="block_design_xxv_ethernet_0_0_tx_clk_out_0"/>
           <PARAMETER NAME="LAYERED_METADATA" VALUE="undef"/>
           <PARAMETER NAME="INSERT_VIP" VALUE="0"/>
           <PORTMAPS>
@@ -9252,54 +9256,54 @@
             <CONNECTION INSTANCE="rst_ps8_0_gt_tx" PORT="peripheral_aresetn"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="S_AXIS_eth2nl_tvalid" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tvalid">
+        <PORT DIR="I" NAME="S_AXIS_eth2nl_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tvalid"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="S_AXIS_eth2nl_tready" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tready">
+        <PORT DIR="O" NAME="S_AXIS_eth2nl_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tready"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tready"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="511" NAME="S_AXIS_eth2nl_tdata" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tdata">
+        <PORT DIR="I" LEFT="511" NAME="S_AXIS_eth2nl_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tdata"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="63" NAME="S_AXIS_eth2nl_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tkeep">
+        <PORT DIR="I" LEFT="63" NAME="S_AXIS_eth2nl_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tkeep"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="S_AXIS_eth2nl_tlast" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tlast">
+        <PORT DIR="I" NAME="S_AXIS_eth2nl_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="rx_fifo" PORT="m_axis_tlast"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="M_AXIS_nl2eth_tvalid" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tvalid">
+        <PORT DIR="O" NAME="M_AXIS_nl2eth_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tvalid"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="M_AXIS_nl2eth_tready" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tready">
+        <PORT DIR="I" NAME="M_AXIS_nl2eth_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tready"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tready"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="511" NAME="M_AXIS_nl2eth_tdata" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tdata">
+        <PORT DIR="O" LEFT="511" NAME="M_AXIS_nl2eth_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tdata"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="63" NAME="M_AXIS_nl2eth_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tkeep">
+        <PORT DIR="O" LEFT="63" NAME="M_AXIS_nl2eth_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tkeep"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="M_AXIS_nl2eth_tlast" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tlast">
+        <PORT DIR="O" NAME="M_AXIS_nl2eth_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="tx_fifo" PORT="s_axis_tlast"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="S_AXIS_sk2nl_tvalid" SIGIS="undef" SIGNAME="adc_data_fifo_m_axis_tvalid">
@@ -9446,7 +9450,7 @@
         </PORT>
       </PORTS>
       <BUSINTERFACES>
-        <BUSINTERFACE BUSNAME="netlayer_M_AXIS_nl2eth" NAME="M_AXIS_nl2eth" TYPE="INITIATOR" VLNV="xilinx.com:interface:axis:1.0">
+        <BUSINTERFACE BUSNAME="netlayer_M_AXIS_nl2eth" NAME="M_AXIS_nl2eth" TYPE="MASTER" VLNV="xilinx.com:interface:axis:1.0">
           <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
@@ -9492,7 +9496,7 @@
             <PORTMAP LOGICAL="TREADY" PHYSICAL="M_AXIS_nl2sk_tready"/>
           </PORTMAPS>
         </BUSINTERFACE>
-        <BUSINTERFACE BUSNAME="rx_fifo_M_AXIS" NAME="S_AXIS_eth2nl" TYPE="TARGET" VLNV="xilinx.com:interface:axis:1.0">
+        <BUSINTERFACE BUSNAME="axis_dwidth_converter_1_M_AXIS" NAME="S_AXIS_eth2nl" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
           <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
@@ -13712,6 +13716,7 @@
         <PORT DIR="O" LEFT="0" NAME="peripheral_aresetn" POLARITY="ACTIVE_LOW" RIGHT="0" SIGIS="rst" SIGNAME="rst_ps8_0_gt_tx_peripheral_aresetn">
           <CONNECTIONS>
             <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="aresetn"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="aresetn"/>
             <CONNECTION INSTANCE="dma_fifo_rx" PORT="s_axis_aresetn"/>
             <CONNECTION INSTANCE="netlayer" PORT="ap_rst_n"/>
             <CONNECTION INSTANCE="ps8_0_axi_periph" PORT="M02_ARESETN"/>
@@ -13727,12 +13732,12 @@
       </DOCUMENTS>
       <PARAMETERS>
         <PARAMETER NAME="C_FAMILY" VALUE="zynquplus"/>
-        <PARAMETER NAME="C_AXIS_TDATA_WIDTH" VALUE="512"/>
+        <PARAMETER NAME="C_AXIS_TDATA_WIDTH" VALUE="64"/>
         <PARAMETER NAME="C_AXIS_TID_WIDTH" VALUE="1"/>
         <PARAMETER NAME="C_AXIS_TDEST_WIDTH" VALUE="1"/>
         <PARAMETER NAME="C_AXIS_TUSER_WIDTH" VALUE="1"/>
-        <PARAMETER NAME="C_AXIS_SIGNAL_SET" VALUE="0b00000000000000000000000000011011"/>
-        <PARAMETER NAME="C_FIFO_DEPTH" VALUE="512"/>
+        <PARAMETER NAME="C_AXIS_SIGNAL_SET" VALUE="0b00000000000000000000000010011011"/>
+        <PARAMETER NAME="C_FIFO_DEPTH" VALUE="8192"/>
         <PARAMETER NAME="C_FIFO_MODE" VALUE="1"/>
         <PARAMETER NAME="C_IS_ACLK_ASYNC" VALUE="1"/>
         <PARAMETER NAME="C_SYNCHRONIZER_STAGE" VALUE="3"/>
@@ -13742,11 +13747,11 @@
         <PARAMETER NAME="C_USE_ADV_FEATURES" VALUE="825241648"/>
         <PARAMETER NAME="C_PROG_EMPTY_THRESH" VALUE="5"/>
         <PARAMETER NAME="C_PROG_FULL_THRESH" VALUE="11"/>
-        <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
+        <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
         <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
         <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
-        <PARAMETER NAME="TUSER_WIDTH" VALUE="0"/>
-        <PARAMETER NAME="FIFO_DEPTH" VALUE="512"/>
+        <PARAMETER NAME="TUSER_WIDTH" VALUE="1"/>
+        <PARAMETER NAME="FIFO_DEPTH" VALUE="8192"/>
         <PARAMETER NAME="FIFO_MODE" VALUE="1"/>
         <PARAMETER NAME="IS_ACLK_ASYNC" VALUE="1"/>
         <PARAMETER NAME="ACLKEN_CONV_MODE" VALUE="0"/>
@@ -13780,29 +13785,30 @@
             <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_clk_out_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="s_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tvalid">
+        <PORT DIR="I" NAME="s_axis_tvalid" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tvalid"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tvalid_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tready">
+        <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef"/>
+        <PORT DIR="I" LEFT="63" NAME="s_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tready"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tdata_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="511" NAME="s_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tdata">
+        <PORT DIR="I" LEFT="7" NAME="s_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tdata"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tkeep_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="63" NAME="s_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tkeep">
+        <PORT DIR="I" NAME="s_axis_tlast" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tkeep"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tlast_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="s_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_m_axis_tlast">
+        <PORT DIR="I" LEFT="0" NAME="s_axis_tuser" RIGHT="0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tuser">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="m_axis_tlast"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_axis_tuser_0"/>
           </CONNECTIONS>
         </PORT>
         <PORT CLKFREQUENCY="156250000" DIR="I" NAME="m_axis_aclk" SIGIS="clk" SIGNAME="xxv_ethernet_0_tx_clk_out_0">
@@ -13810,38 +13816,39 @@
             <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_clk_out_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="m_axis_tvalid" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tvalid">
+        <PORT DIR="O" NAME="m_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tvalid"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="m_axis_tready" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tready">
+        <PORT DIR="I" NAME="m_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tready"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tready"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="511" NAME="m_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tdata">
+        <PORT DIR="O" LEFT="63" NAME="m_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tdata"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="63" NAME="m_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tkeep">
+        <PORT DIR="O" LEFT="7" NAME="m_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tkeep"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="m_axis_tlast" SIGIS="undef" SIGNAME="netlayer_S_AXIS_eth2nl_tlast">
+        <PORT DIR="O" NAME="m_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="S_AXIS_eth2nl_tlast"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
+        <PORT DIR="O" LEFT="0" NAME="m_axis_tuser" RIGHT="0" SIGIS="undef"/>
       </PORTS>
       <BUSINTERFACES>
-        <BUSINTERFACE BUSNAME="axis_dwidth_converter_1_M_AXIS" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
-          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
+        <BUSINTERFACE BUSNAME="xxv_ethernet_0_axis_rx_0" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
+          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
-          <PARAMETER NAME="TUSER_WIDTH" VALUE="0"/>
+          <PARAMETER NAME="TUSER_WIDTH" VALUE="1"/>
           <PARAMETER NAME="HAS_TREADY" VALUE="1"/>
           <PARAMETER NAME="HAS_TSTRB" VALUE="0"/>
           <PARAMETER NAME="HAS_TKEEP" VALUE="1"/>
@@ -13856,14 +13863,15 @@
             <PORTMAP LOGICAL="TKEEP" PHYSICAL="s_axis_tkeep"/>
             <PORTMAP LOGICAL="TLAST" PHYSICAL="s_axis_tlast"/>
             <PORTMAP LOGICAL="TREADY" PHYSICAL="s_axis_tready"/>
+            <PORTMAP LOGICAL="TUSER" PHYSICAL="s_axis_tuser"/>
             <PORTMAP LOGICAL="TVALID" PHYSICAL="s_axis_tvalid"/>
           </PORTMAPS>
         </BUSINTERFACE>
-        <BUSINTERFACE BUSNAME="rx_fifo_M_AXIS" NAME="M_AXIS" TYPE="INITIATOR" VLNV="xilinx.com:interface:axis:1.0">
-          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
+        <BUSINTERFACE BUSNAME="rx_fifo_M_AXIS" NAME="M_AXIS" TYPE="MASTER" VLNV="xilinx.com:interface:axis:1.0">
+          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
-          <PARAMETER NAME="TUSER_WIDTH" VALUE="0"/>
+          <PARAMETER NAME="TUSER_WIDTH" VALUE="1"/>
           <PARAMETER NAME="HAS_TREADY" VALUE="1"/>
           <PARAMETER NAME="HAS_TSTRB" VALUE="0"/>
           <PARAMETER NAME="HAS_TKEEP" VALUE="1"/>
@@ -13878,6 +13886,7 @@
             <PORTMAP LOGICAL="TKEEP" PHYSICAL="m_axis_tkeep"/>
             <PORTMAP LOGICAL="TLAST" PHYSICAL="m_axis_tlast"/>
             <PORTMAP LOGICAL="TREADY" PHYSICAL="m_axis_tready"/>
+            <PORTMAP LOGICAL="TUSER" PHYSICAL="m_axis_tuser"/>
             <PORTMAP LOGICAL="TVALID" PHYSICAL="m_axis_tvalid"/>
           </PORTMAPS>
         </BUSINTERFACE>
@@ -14486,12 +14495,12 @@
       </DOCUMENTS>
       <PARAMETERS>
         <PARAMETER NAME="C_FAMILY" VALUE="zynquplus"/>
-        <PARAMETER NAME="C_AXIS_TDATA_WIDTH" VALUE="512"/>
+        <PARAMETER NAME="C_AXIS_TDATA_WIDTH" VALUE="64"/>
         <PARAMETER NAME="C_AXIS_TID_WIDTH" VALUE="1"/>
         <PARAMETER NAME="C_AXIS_TDEST_WIDTH" VALUE="1"/>
         <PARAMETER NAME="C_AXIS_TUSER_WIDTH" VALUE="1"/>
         <PARAMETER NAME="C_AXIS_SIGNAL_SET" VALUE="0b00000000000000000000000000011011"/>
-        <PARAMETER NAME="C_FIFO_DEPTH" VALUE="512"/>
+        <PARAMETER NAME="C_FIFO_DEPTH" VALUE="8192"/>
         <PARAMETER NAME="C_FIFO_MODE" VALUE="2"/>
         <PARAMETER NAME="C_IS_ACLK_ASYNC" VALUE="0"/>
         <PARAMETER NAME="C_SYNCHRONIZER_STAGE" VALUE="3"/>
@@ -14501,11 +14510,11 @@
         <PARAMETER NAME="C_USE_ADV_FEATURES" VALUE="825765944"/>
         <PARAMETER NAME="C_PROG_EMPTY_THRESH" VALUE="5"/>
         <PARAMETER NAME="C_PROG_FULL_THRESH" VALUE="11"/>
-        <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
+        <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
         <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
         <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
         <PARAMETER NAME="TUSER_WIDTH" VALUE="0"/>
-        <PARAMETER NAME="FIFO_DEPTH" VALUE="512"/>
+        <PARAMETER NAME="FIFO_DEPTH" VALUE="8192"/>
         <PARAMETER NAME="FIFO_MODE" VALUE="2"/>
         <PARAMETER NAME="IS_ACLK_ASYNC" VALUE="0"/>
         <PARAMETER NAME="ACLKEN_CONV_MODE" VALUE="0"/>
@@ -14539,60 +14548,60 @@
             <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_clk_out_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="s_axis_tvalid" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tvalid">
+        <PORT DIR="I" NAME="s_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tvalid"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tready">
+        <PORT DIR="O" NAME="s_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tready"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tready"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="511" NAME="s_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tdata">
+        <PORT DIR="I" LEFT="63" NAME="s_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tdata"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="63" NAME="s_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tkeep">
+        <PORT DIR="I" LEFT="7" NAME="s_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tkeep"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="s_axis_tlast" SIGIS="undef" SIGNAME="netlayer_M_AXIS_nl2eth_tlast">
+        <PORT DIR="I" NAME="s_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="netlayer" PORT="M_AXIS_nl2eth_tlast"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="m_axis_tvalid" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tvalid">
+        <PORT DIR="O" NAME="m_axis_tvalid" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tvalid"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tvalid_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="m_axis_tready" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tready">
+        <PORT DIR="I" NAME="m_axis_tready" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tready"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tready_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="511" NAME="m_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tdata">
+        <PORT DIR="O" LEFT="63" NAME="m_axis_tdata" RIGHT="0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tdata"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tdata_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="63" NAME="m_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tkeep">
+        <PORT DIR="O" LEFT="7" NAME="m_axis_tkeep" RIGHT="0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tkeep"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tkeep_0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="m_axis_tlast" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_s_axis_tlast">
+        <PORT DIR="O" NAME="m_axis_tlast" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="s_axis_tlast"/>
+            <CONNECTION INSTANCE="xxv_ethernet_0" PORT="tx_axis_tlast_0"/>
           </CONNECTIONS>
         </PORT>
       </PORTS>
       <BUSINTERFACES>
-        <BUSINTERFACE BUSNAME="netlayer_M_AXIS_nl2eth" NAME="S_AXIS" TYPE="TARGET" VLNV="xilinx.com:interface:axis:1.0">
-          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
+        <BUSINTERFACE BUSNAME="axis_dwidth_converter_0_M_AXIS" NAME="S_AXIS" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
+          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TUSER_WIDTH" VALUE="0"/>
@@ -14614,7 +14623,7 @@
           </PORTMAPS>
         </BUSINTERFACE>
         <BUSINTERFACE BUSNAME="tx_fifo_M_AXIS" NAME="M_AXIS" TYPE="MASTER" VLNV="xilinx.com:interface:axis:1.0">
-          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="64"/>
+          <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TUSER_WIDTH" VALUE="0"/>
@@ -14654,7 +14663,6 @@
         </PORT>
         <PORT DIR="O" LEFT="0" NAME="Res" RIGHT="0" SIGIS="undef" SIGNAME="util_vector_logic_0_Res">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="aresetn"/>
             <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_aresetn"/>
           </CONNECTIONS>
         </PORT>
@@ -21785,6 +21793,7 @@
           <CONNECTIONS>
             <CONNECTION INSTANCE="adc_data_fifo" PORT="m_axis_aclk"/>
             <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="aclk"/>
+            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="aclk"/>
             <CONNECTION INSTANCE="dma_fifo_rx" PORT="s_axis_aclk"/>
             <CONNECTION INSTANCE="netlayer" PORT="ap_clk"/>
             <CONNECTION INSTANCE="ps8_0_axi_periph" PORT="M02_ACLK"/>
@@ -21795,7 +21804,6 @@
         </PORT>
         <PORT CLKFREQUENCY="156250000" DIR="O" NAME="rx_clk_out_0" SIGIS="clk" SIGNAME="xxv_ethernet_0_rx_clk_out_0">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="aclk"/>
             <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_aclk"/>
             <CONNECTION INSTANCE="xxv_ethernet_0" PORT="rx_core_clk_0"/>
           </CONNECTIONS>
@@ -21918,27 +21926,31 @@
             <CONNECTION INSTANCE="util_vector_logic_0" PORT="Op1"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="rx_axis_tvalid_0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tvalid">
+        <PORT DIR="O" NAME="rx_axis_tvalid_0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tvalid"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="63" NAME="rx_axis_tdata_0" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tdata">
+        <PORT DIR="O" LEFT="63" NAME="rx_axis_tdata_0" RIGHT="0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tdata"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="rx_axis_tlast_0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tlast">
+        <PORT DIR="O" NAME="rx_axis_tlast_0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tlast"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="7" NAME="rx_axis_tkeep_0" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_1_s_axis_tkeep">
+        <PORT DIR="O" LEFT="7" NAME="rx_axis_tkeep_0" RIGHT="0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_1" PORT="s_axis_tkeep"/>
+            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="rx_axis_tuser_0" SIGIS="undef"/>
+        <PORT DIR="O" NAME="rx_axis_tuser_0" SIGIS="undef" SIGNAME="rx_fifo_s_axis_tuser">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="rx_fifo" PORT="s_axis_tuser"/>
+          </CONNECTIONS>
+        </PORT>
         <PORT DIR="O" NAME="stat_rx_framing_err_0" SIGIS="undef"/>
         <PORT DIR="O" NAME="stat_rx_framing_err_valid_0" SIGIS="undef"/>
         <PORT DIR="O" NAME="stat_rx_local_fault_0" SIGIS="undef"/>
@@ -21996,29 +22008,29 @@
             <CONNECTION INSTANCE="util_vector_logic_1" PORT="Op1"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" NAME="tx_axis_tready_0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tready">
+        <PORT DIR="O" NAME="tx_axis_tready_0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tready">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tready"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tready"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="tx_axis_tvalid_0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tvalid">
+        <PORT DIR="I" NAME="tx_axis_tvalid_0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tvalid">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tvalid"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tvalid"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="63" NAME="tx_axis_tdata_0" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tdata">
+        <PORT DIR="I" LEFT="63" NAME="tx_axis_tdata_0" RIGHT="0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tdata">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tdata"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tdata"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="tx_axis_tlast_0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tlast">
+        <PORT DIR="I" NAME="tx_axis_tlast_0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tlast">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tlast"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tlast"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="7" NAME="tx_axis_tkeep_0" RIGHT="0" SIGIS="undef" SIGNAME="axis_dwidth_converter_0_m_axis_tkeep">
+        <PORT DIR="I" LEFT="7" NAME="tx_axis_tkeep_0" RIGHT="0" SIGIS="undef" SIGNAME="tx_fifo_m_axis_tkeep">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="axis_dwidth_converter_0" PORT="m_axis_tkeep"/>
+            <CONNECTION INSTANCE="tx_fifo" PORT="m_axis_tkeep"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="tx_axis_tuser_0" SIGIS="undef"/>
@@ -22168,7 +22180,7 @@
             <PORTMAP LOGICAL="TVALID" PHYSICAL="rx_axis_tvalid_0"/>
           </PORTMAPS>
         </BUSINTERFACE>
-        <BUSINTERFACE BUSNAME="axis_dwidth_converter_0_M_AXIS" NAME="axis_tx_0" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
+        <BUSINTERFACE BUSNAME="tx_fifo_M_AXIS" NAME="axis_tx_0" TYPE="SLAVE" VLNV="xilinx.com:interface:axis:1.0">
           <PARAMETER NAME="TDATA_NUM_BYTES" VALUE="8"/>
           <PARAMETER NAME="TDEST_WIDTH" VALUE="0"/>
           <PARAMETER NAME="TID_WIDTH" VALUE="0"/>
