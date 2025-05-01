@@ -128,16 +128,15 @@ xilinx.com:ip:axis_data_fifo:2.0\
 xilinx.com:ip:axi_dma:7.1\
 xilinx.com:ip:axi_intc:4.1\
 xilinx.com:ip:smartconnect:1.0\
-xilinx.com:ip:axis_dwidth_converter:1.1\
 strathsdr.com:strathsdr:axis_ssr_converter:1.0\
 strathsdr.com:strathsdr:axis_tkeep_pack:1.0\
 xilinx.com:ip:clk_wiz:6.0\
-strathsdr.com:strathsdr:axis_fifo_uflow_ctrl:1.0\
-xilinx.com:RTLKernel:networklayer:1.0\
-xilinx.com:ip:util_vector_logic:2.0\
 xilinx.com:ip:xlconstant:1.1\
-xilinx.com:ip:usp_rf_data_converter:2.5\
+strathsdr.com:strathsdr:axis_fifo_uflow_ctrl:1.0\
 xilinx.com:ip:proc_sys_reset:5.0\
+xilinx.com:ip:usp_rf_data_converter:2.5\
+user.org:user:udp_stream:1.0\
+xilinx.com:ip:util_vector_logic:2.0\
 xilinx.com:ip:xlconcat:2.1\
 xilinx.com:ip:xxv_ethernet:4.0\
 xilinx.com:ip:zynq_ultra_ps_e:3.3\
@@ -405,11 +404,9 @@ proc create_root_design { parentCell } {
    CONFIG.c_include_s2mm_dre {1} \
    CONFIG.c_include_sg {0} \
    CONFIG.c_m_axi_mm2s_data_width {512} \
-   CONFIG.c_m_axi_s2mm_data_width {512} \
    CONFIG.c_m_axis_mm2s_tdata_width {512} \
    CONFIG.c_mm2s_burst_size {64} \
    CONFIG.c_s2mm_burst_size {64} \
-   CONFIG.c_s_axis_s2mm_tdata_width {512} \
    CONFIG.c_sg_include_stscntrl_strm {0} \
    CONFIG.c_sg_length_width {26} \
  ] $axi_dma_cmac
@@ -446,18 +443,6 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.NUM_SI {2} \
  ] $axi_smc
-
-  # Create instance: axis_dwidth_converter_0, and set properties
-  set axis_dwidth_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_0 ]
-  set_property -dict [ list \
-   CONFIG.M_TDATA_NUM_BYTES {8} \
- ] $axis_dwidth_converter_0
-
-  # Create instance: axis_dwidth_converter_1, and set properties
-  set axis_dwidth_converter_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_1 ]
-  set_property -dict [ list \
-   CONFIG.M_TDATA_NUM_BYTES {64} \
- ] $axis_dwidth_converter_1
 
   # Create instance: axis_ssr_converter_dac, and set properties
   set axis_ssr_converter_dac [ create_bd_cell -type ip -vlnv strathsdr.com:strathsdr:axis_ssr_converter:1.0 axis_ssr_converter_dac ]
@@ -497,6 +482,12 @@ proc create_root_design { parentCell } {
    CONFIG.RESET_TYPE {ACTIVE_LOW} \
  ] $clk_wiz_1
 
+  # Create instance: control_input_disable, and set properties
+  set control_input_disable [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 control_input_disable ]
+  set_property -dict [ list \
+   CONFIG.CONST_VAL {0} \
+ ] $control_input_disable
+
   # Create instance: dac_data_fifo, and set properties
   set dac_data_fifo [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 dac_data_fifo ]
   set_property -dict [ list \
@@ -509,26 +500,18 @@ proc create_root_design { parentCell } {
    CONFIG.SYNCHRONIZATION_STAGES {5} \
  ] $dac_data_fifo
 
-  # Create instance: dma_fifo_rx, and set properties
-  set dma_fifo_rx [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 dma_fifo_rx ]
-  set_property -dict [ list \
-   CONFIG.IS_ACLK_ASYNC {1} \
-   CONFIG.TDATA_NUM_BYTES {64} \
- ] $dma_fifo_rx
-
   # Create instance: fifo_controller, and set properties
   set fifo_controller [ create_bd_cell -type ip -vlnv strathsdr.com:strathsdr:axis_fifo_uflow_ctrl:1.0 fifo_controller ]
 
-  # Create instance: netlayer, and set properties
-  set netlayer [ create_bd_cell -type ip -vlnv xilinx.com:RTLKernel:networklayer:1.0 netlayer ]
-
-  # Create instance: pl_reset, and set properties
-  set pl_reset [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 pl_reset ]
+  # Create instance: gt_clk_select, and set properties
+  set gt_clk_select [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 gt_clk_select ]
   set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $pl_reset
+   CONFIG.CONST_VAL {5} \
+   CONFIG.CONST_WIDTH {3} \
+ ] $gt_clk_select
+
+  # Create instance: proc_sys_reset_0, and set properties
+  set proc_sys_reset_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 proc_sys_reset_0 ]
 
   # Create instance: ps8_0_axi_periph, and set properties
   set ps8_0_axi_periph [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 ps8_0_axi_periph ]
@@ -627,9 +610,6 @@ proc create_root_design { parentCell } {
   # Create instance: rst_ps8_0_96M, and set properties
   set rst_ps8_0_96M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps8_0_96M ]
 
-  # Create instance: rst_ps8_0_gt_tx, and set properties
-  set rst_ps8_0_gt_tx [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps8_0_gt_tx ]
-
   # Create instance: rx_fifo, and set properties
   set rx_fifo [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 rx_fifo ]
   set_property -dict [ list \
@@ -640,13 +620,20 @@ proc create_root_design { parentCell } {
   # Create instance: smartconnect_0, and set properties
   set smartconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_0 ]
 
-  # Create instance: tx_fifo, and set properties
-  set tx_fifo [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 tx_fifo ]
+  # Create instance: tx_preamble, and set properties
+  set tx_preamble [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 tx_preamble ]
   set_property -dict [ list \
-   CONFIG.FIFO_DEPTH {8192} \
-   CONFIG.FIFO_MODE {2} \
-   CONFIG.IS_ACLK_ASYNC {0} \
- ] $tx_fifo
+   CONFIG.CONST_VAL {55555555555555} \
+   CONFIG.CONST_WIDTH {56} \
+ ] $tx_preamble
+
+  # Create instance: udp_stream_0, and set properties
+  set udp_stream_0 [ create_bd_cell -type ip -vlnv user.org:user:udp_stream:1.0 udp_stream_0 ]
+  set_property -dict [ list \
+   CONFIG.C_M00_AXIS_TKEEP_WIDTH {8} \
+   CONFIG.C_S00_AXI_ADDR_WIDTH {5} \
+   CONFIG.FINAL_STATE {21} \
+ ] $udp_stream_0
 
   # Create instance: util_vector_logic_0, and set properties
   set util_vector_logic_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_0 ]
@@ -656,52 +643,18 @@ proc create_root_design { parentCell } {
    CONFIG.LOGO_FILE {data/sym_notgate.png} \
  ] $util_vector_logic_0
 
-  # Create instance: util_vector_logic_1, and set properties
-  set util_vector_logic_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_1 ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $util_vector_logic_1
-
-  # Create instance: util_vector_logic_2, and set properties
-  set util_vector_logic_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_2 ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $util_vector_logic_2
-
   # Create instance: xlconcat_0, and set properties
   set xlconcat_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_0 ]
   set_property -dict [ list \
    CONFIG.NUM_PORTS {2} \
  ] $xlconcat_0
 
-  # Create instance: xlconstant_0, and set properties
-  set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
-  set_property -dict [ list \
-   CONFIG.CONST_VAL {55555555555555} \
-   CONFIG.CONST_WIDTH {56} \
- ] $xlconstant_0
-
-  # Create instance: xlconstant_1, and set properties
-  set xlconstant_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_1 ]
-  set_property -dict [ list \
-   CONFIG.CONST_VAL {5} \
-   CONFIG.CONST_WIDTH {3} \
- ] $xlconstant_1
-
-  # Create instance: xlconstant_2, and set properties
-  set xlconstant_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_2 ]
-  set_property -dict [ list \
-   CONFIG.CONST_VAL {0} \
- ] $xlconstant_2
-
   # Create instance: xxv_ethernet_0, and set properties
   set xxv_ethernet_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xxv_ethernet:4.0 xxv_ethernet_0 ]
   set_property -dict [ list \
    CONFIG.BASE_R_KR {BASE-R} \
+   CONFIG.ENABLE_PIPELINE_REG {1} \
+   CONFIG.ENABLE_TX_FLOW_CONTROL_LOGIC {0} \
    CONFIG.GT_REF_CLK_FREQ {156.25} \
    CONFIG.LINE_RATE {10} \
  ] $xxv_ethernet_0
@@ -2145,21 +2098,15 @@ Port;FD4A0000;FD4AFFFF;0|FPD;DPDMA;FD4C0000;FD4CFFFF;0|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_intf_net -intf_net axi_dma_dac_M_AXI_MM2S [get_bd_intf_pins axi_dma_dac/M_AXI_MM2S] [get_bd_intf_pins smartconnect_0/S00_AXI]
   connect_bd_intf_net -intf_net axi_dma_dac_M_AXI_SG [get_bd_intf_pins axi_dma_dac/M_AXI_SG] [get_bd_intf_pins smartconnect_0/S01_AXI]
   connect_bd_intf_net -intf_net axi_smc_M00_AXI [get_bd_intf_pins axi_smc/M00_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HP0_FPD]
-  connect_bd_intf_net -intf_net axis_data_fifo_0_M_AXIS [get_bd_intf_pins adc_data_fifo/M_AXIS] [get_bd_intf_pins netlayer/S_AXIS_sk2nl]
   connect_bd_intf_net -intf_net axis_data_fifo_1_M_AXIS [get_bd_intf_pins dac_data_fifo/M_AXIS] [get_bd_intf_pins fifo_controller/S_AXIS]
-  connect_bd_intf_net -intf_net axis_dwidth_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/M_AXIS] [get_bd_intf_pins tx_fifo/S_AXIS]
-  connect_bd_intf_net -intf_net axis_dwidth_converter_1_M_AXIS [get_bd_intf_pins axis_dwidth_converter_1/M_AXIS] [get_bd_intf_pins netlayer/S_AXIS_eth2nl]
   connect_bd_intf_net -intf_net axis_fifo_uflow_ctrl_0_M_AXIS [get_bd_intf_pins fifo_controller/M_AXIS] [get_bd_intf_pins rfdc/s00_axis]
   connect_bd_intf_net -intf_net axis_ssr_converter_dac_M_AXIS [get_bd_intf_pins axis_ssr_converter_dac/M_AXIS] [get_bd_intf_pins dac_data_fifo/S_AXIS]
   connect_bd_intf_net -intf_net axis_tkeep_pack_0_M_AXIS [get_bd_intf_pins axis_ssr_converter_dac/S_AXIS] [get_bd_intf_pins axis_tkeep_pack_0/M_AXIS]
   connect_bd_intf_net -intf_net dac0_clk_1 [get_bd_intf_ports dac0_clk] [get_bd_intf_pins rfdc/dac0_clk]
   connect_bd_intf_net -intf_net diff_clock_rtl_1 [get_bd_intf_ports diff_clock_rtl] [get_bd_intf_pins xxv_ethernet_0/gt_ref_clk]
-  connect_bd_intf_net -intf_net dma_fifo_rx_M_AXIS [get_bd_intf_pins axi_dma_cmac/S_AXIS_S2MM] [get_bd_intf_pins dma_fifo_rx/M_AXIS]
-  connect_bd_intf_net -intf_net netlayer_M_AXIS_nl2eth [get_bd_intf_pins axis_dwidth_converter_0/S_AXIS] [get_bd_intf_pins netlayer/M_AXIS_nl2eth]
-  connect_bd_intf_net -intf_net networklayer_0_M_AXIS_nl2sk [get_bd_intf_pins dma_fifo_rx/S_AXIS] [get_bd_intf_pins netlayer/M_AXIS_nl2sk]
   connect_bd_intf_net -intf_net ps8_0_axi_periph_M00_AXI [get_bd_intf_pins axi_dma_cmac/S_AXI_LITE] [get_bd_intf_pins ps8_0_axi_periph/M00_AXI]
   connect_bd_intf_net -intf_net ps8_0_axi_periph_M01_AXI [get_bd_intf_pins ps8_0_axi_periph/M01_AXI] [get_bd_intf_pins xxv_ethernet_0/s_axi_0]
-  connect_bd_intf_net -intf_net ps8_0_axi_periph_M02_AXI [get_bd_intf_pins netlayer/S_AXIL_nl] [get_bd_intf_pins ps8_0_axi_periph/M02_AXI]
+  connect_bd_intf_net -intf_net ps8_0_axi_periph_M02_AXI [get_bd_intf_pins ps8_0_axi_periph/M02_AXI] [get_bd_intf_pins udp_stream_0/S00_AXI]
   connect_bd_intf_net -intf_net ps8_0_axi_periph_M03_AXI [get_bd_intf_pins adc_packet_generator/S_AXI_packet_ctrl] [get_bd_intf_pins ps8_0_axi_periph/M03_AXI]
   connect_bd_intf_net -intf_net ps8_0_axi_periph_M05_AXI [get_bd_intf_pins ps8_0_axi_periph/M05_AXI] [get_bd_intf_pins rfdc/s_axi]
   connect_bd_intf_net -intf_net ps8_0_axi_periph_M06_AXI [get_bd_intf_pins axi_dma_dac/S_AXI_LITE] [get_bd_intf_pins ps8_0_axi_periph/M06_AXI]
@@ -2171,10 +2118,10 @@ Port;FD4A0000;FD4AFFFF;0|FPD;DPDMA;FD4C0000;FD4CFFFF;0|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_intf_net -intf_net rfdc_m23_axis [get_bd_intf_pins adc_packet_generator/S03_AXIS] [get_bd_intf_pins rfdc/m23_axis]
   connect_bd_intf_net -intf_net rfdc_vout00 [get_bd_intf_ports vout00] [get_bd_intf_pins rfdc/vout00]
   connect_bd_intf_net -intf_net rx_channel_M_AXIS [get_bd_intf_pins adc_data_fifo/S_AXIS] [get_bd_intf_pins adc_packet_generator/M_AXIS]
-  connect_bd_intf_net -intf_net rx_fifo_M_AXIS [get_bd_intf_pins axis_dwidth_converter_1/S_AXIS] [get_bd_intf_pins rx_fifo/M_AXIS]
+  connect_bd_intf_net -intf_net rx_fifo_M_AXIS [get_bd_intf_pins axi_dma_cmac/S_AXIS_S2MM] [get_bd_intf_pins rx_fifo/M_AXIS]
   connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HP2_FPD]
   connect_bd_intf_net -intf_net sysref_in_1 [get_bd_intf_ports sysref_in] [get_bd_intf_pins rfdc/sysref_in]
-  connect_bd_intf_net -intf_net tx_fifo_M_AXIS [get_bd_intf_pins tx_fifo/M_AXIS] [get_bd_intf_pins xxv_ethernet_0/axis_tx_0]
+  connect_bd_intf_net -intf_net udp_stream_0_M00_AXIS [get_bd_intf_pins udp_stream_0/M00_AXIS] [get_bd_intf_pins xxv_ethernet_0/axis_tx_0]
   connect_bd_intf_net -intf_net vin2_01_1 [get_bd_intf_ports vin2_01] [get_bd_intf_pins rfdc/vin2_01]
   connect_bd_intf_net -intf_net xxv_ethernet_0_axis_rx_0 [get_bd_intf_pins rx_fifo/S_AXIS] [get_bd_intf_pins xxv_ethernet_0/axis_rx_0]
   connect_bd_intf_net -intf_net xxv_ethernet_0_gt_serial_port [get_bd_intf_ports gt_rtl] [get_bd_intf_pins xxv_ethernet_0/gt_serial_port]
@@ -2188,35 +2135,32 @@ Port;FD4A0000;FD4AFFFF;0|FPD;DPDMA;FD4C0000;FD4CFFFF;0|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_net -net axis_data_fifo_1_almost_empty [get_bd_pins dac_data_fifo/almost_empty] [get_bd_pins fifo_controller/empty]
   connect_bd_net -net axis_data_fifo_1_prog_empty [get_bd_pins dac_data_fifo/prog_empty] [get_bd_pins fifo_controller/prog_empty]
   connect_bd_net -net axis_fifo_uflow_ctrl_0_irq_underflow [get_bd_pins fifo_controller/irq_underflow] [get_bd_pins xlconcat_0/In0]
-  connect_bd_net -net clk_wiz_0_clk_out1 [get_bd_pins axi_dma_cmac/m_axi_mm2s_aclk] [get_bd_pins axi_dma_cmac/m_axi_s2mm_aclk] [get_bd_pins axi_dma_cmac/s_axi_lite_aclk] [get_bd_pins axi_smc/aclk] [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins dma_fifo_rx/m_axis_aclk] [get_bd_pins ps8_0_axi_periph/M00_ACLK] [get_bd_pins rst_333M/slowest_sync_clk] [get_bd_pins zynq_ultra_ps_e_0/saxihp0_fpd_aclk]
+  connect_bd_net -net clk_wiz_0_clk_out1 [get_bd_pins axi_dma_cmac/m_axi_mm2s_aclk] [get_bd_pins axi_dma_cmac/m_axi_s2mm_aclk] [get_bd_pins axi_dma_cmac/s_axi_lite_aclk] [get_bd_pins axi_smc/aclk] [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins ps8_0_axi_periph/M00_ACLK] [get_bd_pins rst_333M/slowest_sync_clk] [get_bd_pins rx_fifo/m_axis_aclk] [get_bd_pins zynq_ultra_ps_e_0/saxihp0_fpd_aclk]
   connect_bd_net -net clk_wiz_0_locked [get_bd_pins clk_wiz_0/locked] [get_bd_pins rst_333M/dcm_locked]
   connect_bd_net -net clk_wiz_1_locked [get_bd_pins clk_wiz_1/locked] [get_bd_pins rst_dac_333M/dcm_locked]
   connect_bd_net -net cmac_gt_rxusrclk2 [get_bd_pins rx_fifo/s_axis_aclk] [get_bd_pins xxv_ethernet_0/rx_clk_out_0] [get_bd_pins xxv_ethernet_0/rx_core_clk_0]
-  connect_bd_net -net cmac_gt_txusrclk2 [get_bd_pins adc_data_fifo/m_axis_aclk] [get_bd_pins axis_dwidth_converter_0/aclk] [get_bd_pins axis_dwidth_converter_1/aclk] [get_bd_pins dma_fifo_rx/s_axis_aclk] [get_bd_pins netlayer/ap_clk] [get_bd_pins ps8_0_axi_periph/M02_ACLK] [get_bd_pins rst_ps8_0_gt_tx/slowest_sync_clk] [get_bd_pins rx_fifo/m_axis_aclk] [get_bd_pins tx_fifo/s_axis_aclk] [get_bd_pins xxv_ethernet_0/tx_clk_out_0]
-  connect_bd_net -net pl_reset_Res [get_bd_pins pl_reset/Res] [get_bd_pins xxv_ethernet_0/gtwiz_reset_rx_datapath_0] [get_bd_pins xxv_ethernet_0/gtwiz_reset_tx_datapath_0]
+  connect_bd_net -net cmac_gt_txusrclk2 [get_bd_pins adc_data_fifo/m_axis_aclk] [get_bd_pins proc_sys_reset_0/slowest_sync_clk] [get_bd_pins ps8_0_axi_periph/M02_ACLK] [get_bd_pins udp_stream_0/m00_axis_aclk] [get_bd_pins udp_stream_0/s00_axi_aclk] [get_bd_pins xxv_ethernet_0/tx_clk_out_0]
+  connect_bd_net -net proc_sys_reset_0_peripheral_aresetn [get_bd_pins proc_sys_reset_0/peripheral_aresetn] [get_bd_pins ps8_0_axi_periph/M02_ARESETN] [get_bd_pins udp_stream_0/m00_axis_aresetn] [get_bd_pins udp_stream_0/s00_axi_aresetn]
   connect_bd_net -net qsfp_intl_ls_1 [get_bd_ports led_3] [get_bd_ports qsfp_intl_ls]
   connect_bd_net -net rfdc_clk_dac0 [get_bd_pins clk_wiz_1/clk_in1] [get_bd_pins dac_data_fifo/m_axis_aclk] [get_bd_pins fifo_controller/aclk] [get_bd_pins ps8_0_axi_periph/M08_ACLK] [get_bd_pins rfdc/clk_dac0] [get_bd_pins rfdc/s0_axis_aclk] [get_bd_pins rst_dac_153M6/slowest_sync_clk]
   connect_bd_net -net rst_307M2_peripheral_aresetn [get_bd_pins adc_data_fifo/s_axis_aresetn] [get_bd_pins adc_packet_generator/s_axis_aresetn] [get_bd_pins ps8_0_axi_periph/M03_ARESETN] [get_bd_pins rfdc/m2_axis_aresetn] [get_bd_pins rst_307M2/peripheral_aresetn]
   connect_bd_net -net rst_307M3_peripheral_aresetn [get_bd_pins clk_wiz_1/resetn] [get_bd_pins fifo_controller/aresetn] [get_bd_pins ps8_0_axi_periph/M08_ARESETN] [get_bd_pins rfdc/s0_axis_aresetn] [get_bd_pins rst_dac_153M6/peripheral_aresetn]
   connect_bd_net -net rst_dac_333M_peripheral_aresetn [get_bd_pins axi_dma_dac/axi_resetn] [get_bd_pins axis_ssr_converter_dac/aresetn] [get_bd_pins axis_tkeep_pack_0/aresetn] [get_bd_pins dac_data_fifo/s_axis_aresetn] [get_bd_pins ps8_0_axi_periph/M06_ARESETN] [get_bd_pins rst_dac_333M/peripheral_aresetn] [get_bd_pins smartconnect_0/aresetn]
   connect_bd_net -net rst_ps8_0_96M_peripheral_aresetn [get_bd_pins adc_packet_generator/s_axi_chctrl_aresetn] [get_bd_pins axi_intc_0/s_axi_aresetn] [get_bd_pins clk_wiz_0/resetn] [get_bd_pins ps8_0_axi_periph/ARESETN] [get_bd_pins ps8_0_axi_periph/M01_ARESETN] [get_bd_pins ps8_0_axi_periph/M04_ARESETN] [get_bd_pins ps8_0_axi_periph/M05_ARESETN] [get_bd_pins ps8_0_axi_periph/M07_ARESETN] [get_bd_pins ps8_0_axi_periph/S00_ARESETN] [get_bd_pins rfdc/s_axi_aresetn] [get_bd_pins rst_ps8_0_96M/peripheral_aresetn] [get_bd_pins xxv_ethernet_0/s_axi_aresetn_0]
-  connect_bd_net -net rst_ps8_0_96M_peripheral_reset [get_bd_pins rst_ps8_0_96M/peripheral_reset] [get_bd_pins util_vector_logic_2/Op1] [get_bd_pins xxv_ethernet_0/sys_reset]
-  connect_bd_net -net rst_ps8_0_gt_tx_peripheral_aresetn [get_bd_pins axis_dwidth_converter_0/aresetn] [get_bd_pins axis_dwidth_converter_1/aresetn] [get_bd_pins dma_fifo_rx/s_axis_aresetn] [get_bd_pins netlayer/ap_rst_n] [get_bd_pins ps8_0_axi_periph/M02_ARESETN] [get_bd_pins rst_ps8_0_gt_tx/peripheral_aresetn] [get_bd_pins tx_fifo/s_axis_aresetn]
+  connect_bd_net -net rst_ps8_0_96M_peripheral_reset [get_bd_pins rst_ps8_0_96M/peripheral_reset] [get_bd_pins xxv_ethernet_0/sys_reset]
   connect_bd_net -net sw_0_1 [get_bd_ports led_0] [get_bd_ports qsfp_resetl_ls] [get_bd_ports sw_0]
   connect_bd_net -net sw_1_1 [get_bd_ports led_1] [get_bd_ports qsfp_lpmode_ls] [get_bd_ports sw_1]
   connect_bd_net -net sw_2_1 [get_bd_ports led_2] [get_bd_ports qsfp_modsell_ls] [get_bd_ports sw_2]
   connect_bd_net -net usp_rf_data_converter_0_clk_adc2 [get_bd_pins adc_data_fifo/s_axis_aclk] [get_bd_pins adc_packet_generator/s_axis_aclk] [get_bd_pins ps8_0_axi_periph/M03_ACLK] [get_bd_pins rfdc/clk_adc2] [get_bd_pins rfdc/m2_axis_aclk] [get_bd_pins rst_307M2/slowest_sync_clk]
   connect_bd_net -net util_vector_logic_0_Res [get_bd_pins rx_fifo/s_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
-  connect_bd_net -net util_vector_logic_1_Res [get_bd_pins rst_ps8_0_gt_tx/ext_reset_in] [get_bd_pins util_vector_logic_1/Res]
   connect_bd_net -net xlconcat_0_dout [get_bd_pins axi_intc_0/intr] [get_bd_pins xlconcat_0/dout]
-  connect_bd_net -net xlconstant_0_dout [get_bd_pins reset_disable/dout] [get_bd_pins xxv_ethernet_0/qpllreset_in_0] [get_bd_pins xxv_ethernet_0/rx_reset_0] [get_bd_pins xxv_ethernet_0/tx_reset_0]
-  connect_bd_net -net xlconstant_0_dout1 [get_bd_pins xlconstant_0/dout] [get_bd_pins xxv_ethernet_0/tx_preamblein_0]
-  connect_bd_net -net xlconstant_1_dout [get_bd_pins xlconstant_1/dout] [get_bd_pins xxv_ethernet_0/rxoutclksel_in_0] [get_bd_pins xxv_ethernet_0/txoutclksel_in_0]
-  connect_bd_net -net xlconstant_2_dout [get_bd_pins xlconstant_2/dout] [get_bd_pins xxv_ethernet_0/ctl_tx_send_idle_0] [get_bd_pins xxv_ethernet_0/ctl_tx_send_lfi_0] [get_bd_pins xxv_ethernet_0/ctl_tx_send_rfi_0]
+  connect_bd_net -net xlconstant_0_dout [get_bd_pins reset_disable/dout] [get_bd_pins xxv_ethernet_0/gtwiz_reset_rx_datapath_0] [get_bd_pins xxv_ethernet_0/gtwiz_reset_tx_datapath_0] [get_bd_pins xxv_ethernet_0/qpllreset_in_0] [get_bd_pins xxv_ethernet_0/rx_reset_0] [get_bd_pins xxv_ethernet_0/tx_reset_0]
+  connect_bd_net -net xlconstant_0_dout1 [get_bd_pins tx_preamble/dout] [get_bd_pins xxv_ethernet_0/tx_preamblein_0]
+  connect_bd_net -net xlconstant_1_dout [get_bd_pins gt_clk_select/dout] [get_bd_pins xxv_ethernet_0/rxoutclksel_in_0] [get_bd_pins xxv_ethernet_0/txoutclksel_in_0]
+  connect_bd_net -net xlconstant_2_dout [get_bd_pins control_input_disable/dout] [get_bd_pins xxv_ethernet_0/ctl_tx_send_idle_0] [get_bd_pins xxv_ethernet_0/ctl_tx_send_lfi_0] [get_bd_pins xxv_ethernet_0/ctl_tx_send_rfi_0]
   connect_bd_net -net xxv_ethernet_0_user_rx_reset_0 [get_bd_pins util_vector_logic_0/Op1] [get_bd_pins xxv_ethernet_0/user_rx_reset_0]
-  connect_bd_net -net xxv_ethernet_0_user_tx_reset_0 [get_bd_pins util_vector_logic_1/Op1] [get_bd_pins xxv_ethernet_0/user_tx_reset_0]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0 [get_bd_pins adc_packet_generator/s_axi_chctrl_aclk] [get_bd_pins axi_intc_0/s_axi_aclk] [get_bd_pins clk_wiz_0/clk_in1] [get_bd_pins ps8_0_axi_periph/ACLK] [get_bd_pins ps8_0_axi_periph/M01_ACLK] [get_bd_pins ps8_0_axi_periph/M04_ACLK] [get_bd_pins ps8_0_axi_periph/M05_ACLK] [get_bd_pins ps8_0_axi_periph/M07_ACLK] [get_bd_pins ps8_0_axi_periph/S00_ACLK] [get_bd_pins rfdc/s_axi_aclk] [get_bd_pins rst_ps8_0_96M/slowest_sync_clk] [get_bd_pins xxv_ethernet_0/dclk] [get_bd_pins xxv_ethernet_0/s_axi_aclk_0] [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
-  connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0 [get_bd_pins pl_reset/Op1] [get_bd_pins rst_307M2/ext_reset_in] [get_bd_pins rst_333M/ext_reset_in] [get_bd_pins rst_dac_153M6/ext_reset_in] [get_bd_pins rst_dac_333M/ext_reset_in] [get_bd_pins rst_ps8_0_96M/ext_reset_in] [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0]
+  connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0 [get_bd_pins proc_sys_reset_0/ext_reset_in] [get_bd_pins rst_307M2/ext_reset_in] [get_bd_pins rst_333M/ext_reset_in] [get_bd_pins rst_dac_153M6/ext_reset_in] [get_bd_pins rst_dac_333M/ext_reset_in] [get_bd_pins rst_ps8_0_96M/ext_reset_in] [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x80000000 -target_address_space [get_bd_addr_spaces axi_dma_cmac/Data_MM2S] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP2/HP0_DDR_LOW] -force
@@ -2227,10 +2171,10 @@ Port;FD4A0000;FD4AFFFF;0|FPD;DPDMA;FD4C0000;FD4CFFFF;0|FPD;DDR_XMPU5_CFG;FD05000
   assign_bd_address -offset 0xA0050000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs axi_dma_dac/S_AXI_LITE/Reg] -force
   assign_bd_address -offset 0xA0060000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs axi_intc_0/S_AXI/Reg] -force
   assign_bd_address -offset 0xA0070000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs fifo_controller/S_AXI_Lite/S_AXI_Lite_reg] -force
-  assign_bd_address -offset 0xA0020000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs netlayer/S_AXIL_nl/reg0] -force
   assign_bd_address -offset 0xA0040000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs adc_packet_generator/netlayer_switch/S_AXI_CTRL/Reg] -force
   assign_bd_address -offset 0xA0030000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs adc_packet_generator/packet_generator/S_AXI_Lite/reg0] -force
   assign_bd_address -offset 0xA0080000 -range 0x00040000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs rfdc/s_axi/Reg] -force
+  assign_bd_address -offset 0xA0020000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs udp_stream_0/S00_AXI/reg0] -force
   assign_bd_address -offset 0xA0010000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs xxv_ethernet_0/s_axi_0/Reg] -force
 
   # Exclude Address Segments

@@ -4,11 +4,14 @@ module udp_stream_v1_0 #
 (
     // Parameters of Axi Slave Bus Interface S00_AXI
     parameter integer C_S00_AXI_DATA_WIDTH	= 32,
-    parameter integer C_S00_AXI_ADDR_WIDTH	= 5,
+    parameter integer C_S00_AXI_ADDR_WIDTH	= 6,
 
     // Parameters of Axi Master Bus Interface M00_AXIS
     parameter integer C_M00_AXIS_TDATA_WIDTH = 64,
-    parameter integer C_M00_AXIS_TKEEP_WIDTH = 8
+    parameter integer C_M00_AXIS_TKEEP_WIDTH = 8,
+
+    parameter integer PAYLOAD_LENGTH = 512,
+    parameter integer FINAL_STATE = ((PAYLOAD_LENGTH - 3)/4) + 6
 )
 (
     // Ports of Axi Slave Bus Interface S00_AXI
@@ -40,56 +43,47 @@ module udp_stream_v1_0 #
     output wire m00_axis_tvalid,
     output wire [C_M00_AXIS_TDATA_WIDTH-1 : 0] m00_axis_tdata,
     output wire [C_M00_AXIS_TKEEP_WIDTH-1 : 0] m00_axis_tkeep,
-    output wire m00_axis_tuser,
+    output wire [7 : 0] m00_axis_tuser,
     output wire m00_axis_tlast,
     input wire m00_axis_tready
-
 );
 
-    // Define the UDP packet (fixed example from the previous response)
-    // reg [7:0] udp_packet_int[0:47];  // 48 bytes (384-bit packet) for 8-bit chunks
-    reg [7:0] udp_packet_int[0:86];  // 48 bytes (384-bit packet) for 8-bit chunks
-    // reg [63:0] udp_packet[0:5];  // 6 words (576-bit packet) for 64-bit chunks
-    reg [63:0] udp_packet[0:10];  // 6 words (576-bit packet) for 64-bit chunks
+    // Define the UDP packet 
+    reg [7:0] udp_packet_int[0:41];  // Ethernet frame, IP header, UDP header
+    reg [63:0] udp_packet[0:FINAL_STATE];     // 22 words for 64-bit chunks
 
     // Ethernet Header
-    reg [7:0] eth_dst_mac[5:0]; // Destination MAC address (6 bytes)
-    reg [7:0] eth_src_mac[5:0]; // Source MAC address (6 bytes)
-    reg [7:0] eth_type[1:0];     // EtherType (e.g., 0x0800 for IPv4)
+    reg [7:0] eth_dst_mac[5:0];      // Destination MAC address (6 bytes)
+    reg [7:0] eth_src_mac[5:0];      // Source MAC address (6 bytes)
+    reg [7:0] eth_type[1:0];         // EtherType (e.g., 0x0800 for IPv4)
 
-    // Ethernet Footer
-    reg [31:0] eth_fcs;
-    reg [7:0] eth_cksum[4:0];  // Ethernet checksum (FCS)
+    // Initial IP Header Parts 
+    reg [7:0] ip_header[0:19];       // Array to store 8-bit words of IP header
+    reg [7:0] udp_header[0:7];       // Array to store 8-bit words of UDP header
+    reg [31:0] sum;                  // IP Checksum
+    reg [15:0] word;                 // 16-bit word for summing
+    reg update_packet;
+    reg [7:0] eth_dst_mac_lsb[3:0]; // Temp storage for Destination MAC LSB
 
-    // Initial IP Header Parts (Before checksum)
-    reg [7:0] ip_header[0:19];   // Array to store 8-bit words of IP header
-    reg [31:0] sum; // IP Checksum
-    reg [7:0] udp_header[0:7];   // Array to store 8-bit words of UDP header
+    // Payload
+    reg [15:0] payload[PAYLOAD_LENGTH-1 : 0];  // 512 short ints = 1024 bytes
 
     // State machine signals
-    // reg [2:0] state;          // Current state (0 to 5 to traverse the packet)
-    // reg [2:0] packet_index;   // Index for each 64-bit word in the UDP packet
-    reg [3:0] state;          // Current state (0 to 5 to traverse the packet)
-    reg [3:0] packet_index;   // Index for each 64-bit word in the UDP packet
+    reg [15:0] state;                 // Current state (0 to 5 to traverse the packet)
+    reg [15:0] packet_index;          // Index for each 64-bit word in the UDP packet
 
-    reg [7:0] tkeep_status;
+    // AXI bus signals
+    reg [7:0] tkeep_status;          // Signal to indicate valid bytes
 
-    // FCS calculation registers
-    reg [31:0] crc_reg;
-    reg [7:0] data_byte;
-    reg valid_data;
-    reg end_of_frame_signal;
+    // Timer to trigger packet transmission every 100ms
+    reg [31:0] counter;              // 32-bit counter for intervals
+    reg [31:0] sent_counter;         // 32-bit counter for sent packets
+    reg [31:0] packet_delay;        // Counter value to send packet
+    reg trigger_send;                // Signal to trigger sending the packet
 
-    // Timer to trigger packet transmission every second
-    reg [31:0] counter;       // 32-bit counter for 1-second intervals
-    reg [31:0] sent_counter;  // 32-bit counter for sent packets
-    reg trigger_send;         // Signal to trigger sending the packet
-
-    // Ethernet header (dummy values)
-    // Dest MAC:  Aquantia 3c:8c:f8:60:fa:ea
-    // Dest MAC:  Intel X520 6c:92:bf:42:52:12
-
+    // Initialize Ethernet frame, IP header, UDP header
     initial begin
+        // Ethernet frame
         eth_dst_mac[0] = 8'hFF;
         eth_dst_mac[1] = 8'hFF;
         eth_dst_mac[2] = 8'hFF;
@@ -106,24 +100,20 @@ module udp_stream_v1_0 #
 
         eth_type[0] = 8'h08;
         eth_type[1] = 8'h00;    // EtherType for IPv4
-    end
 
-    // IP header (40 bytes, now 8-bit wide)
-    // 4500 0049 e40f 4000 ff11 f1ee c0a8 0401
-    // e000 00fb 
-    initial begin
+        // IP Header
         ip_header[0][7:0] = 8'h45;   // Version (4) + Header Length (5)
         ip_header[1][7:0] = 8'h00;
-        ip_header[2][7:0] = 8'h00;   // Total Length (30 bytes)
-        ip_header[3][7:0] = 8'h49;   // 
-        ip_header[4][7:0] = 8'hE4;   // Identification (0)
-        ip_header[5][7:0] = 8'h0F;
+        ip_header[2][7:0] = 8'h00;   // Total Length 20 + 8 + Payload
+        ip_header[3][7:0] = 8'h9C;   // 156 (9C)
+        ip_header[4][7:0] = 8'h00;   // Identification (0)
+        ip_header[5][7:0] = 8'h01;
         ip_header[6][7:0] = 8'h40;   // Flags and Fragment Offset
         ip_header[7][7:0] = 8'h00;
-        ip_header[8][7:0] = 8'hFF;   // TTL (64) and protocol (UDP)
+        ip_header[8][7:0] = 8'hFF;   // TTL (255) and protocol (UDP)
         ip_header[9][7:0] = 8'h11;
-        ip_header[10][7:0] = 8'hF1;   // Checksum placeholder B117
-        ip_header[11][7:0] = 8'hEE;
+        ip_header[10][7:0] = 8'hF1;   // Checksum placeholder
+        ip_header[11][7:0] = 8'h9A;
         ip_header[12][7:0] = 8'hC0;   // Source IP (192.168.4.99)
         ip_header[13][7:0] = 8'hA8;
         ip_header[14][7:0] = 8'h04;
@@ -132,171 +122,178 @@ module udp_stream_v1_0 #
         ip_header[17][7:0] = 8'hA8;
         ip_header[18][7:0] = 8'h04;
         ip_header[19][7:0] = 8'h01;  
-    end
 
-    integer i;
-    integer j;
-    initial begin
-        sum = 32'b0;
-
-        for (i = 0; i < 20; i = i + 1) begin
-            sum = sum + ip_header[i];
-        end
-        sum = sum + (sum >> 16);  // Add overflow from the upper 16 bits
-        ip_header[10] = ~sum[7:0];  // One's complement 
-        ip_header[11] = ~sum[15:8];
-    end
-
-    // UDP header (16 bytes, now 8-bit wide)
-    // 14e9 14e9 0035 a5eb 
-    initial begin
+        // UDP Header
         udp_header[0][7:0] = 8'hEA;   // Source port 60133
         udp_header[1][7:0] = 8'hE5;
-        udp_header[2][7:0] = 8'hEA;   // Dest port
+        udp_header[2][7:0] = 8'hEA;   // Dest port 60133
         udp_header[3][7:0] = 8'hE5;
-        udp_header[4][7:0] = 8'h00;   // Length 8 + 6
-        udp_header[5][7:0] = 8'h35;
-        udp_header[6][7:0] = 8'hA5;   // Checksum (Optional)
-        udp_header[7][7:0] = 8'hEB;
+        udp_header[4][7:0] = 8'h00;   // Length 8 + Payload
+        udp_header[5][7:0] = 8'h88;   // 136 (88)
+        udp_header[6][7:0] = 8'h00;   // Checksum placeholder 
+        udp_header[7][7:0] = 8'h00;   // 
     end
 
-    // FCS (CRC-32) Calculation
-    always @(posedge m00_axis_aclk or negedge m00_axis_aresetn) begin
-        if (~m00_axis_aresetn) begin
+    // Assign payload
+    integer i;
+    integer incr;
+    reg[15:0] ip_header_length;
+    reg[15:0] udp_header_length;
+    initial begin
+        ip_header_length[15:0] = 20 + 8 + 2*PAYLOAD_LENGTH;
+        udp_header_length[15:0] = 2*PAYLOAD_LENGTH;
+
+        ip_header[2][7:0] = ip_header_length >> 8;
+        ip_header[3][7:0] = ip_header_length & 16'h00FF;
+        udp_header[4][7:0] = udp_header_length >> 8;
+        udp_header[5][7:0] = udp_header_length & 16'h00FF;
+
+        payload[0] = 0;
+        payload[1] = 255;
+        incr = 1;
+
+        for (i = 2; i < PAYLOAD_LENGTH; i = i + 2) begin
+            payload[i] = incr; 
+            payload[i+1] = 255 - incr;
+            incr = incr + 1;
+        end
+    end
+
+    initial begin
+        update_packet = 1'b0;
+        packet_delay = 32'd10000000;
+    end
+
+    // Calculate IP Checksum
+    always @(posedge m00_axis_aclk) begin
+        // Reassign static packet on reset
+        if ((m00_axis_aresetn == 1'b0) || (update_packet == 1'b1)) begin
+            sum = 32'b0;
+            ip_header[10] = 8'h0;
+            ip_header[11] = 8'h0;
+        
+            // Sum the IP header in 16-bit words
+            for (i = 0; i < 20; i = i + 2) begin
+                // Concatenate two consecutive bytes to form a 16-bit word
+                word = {ip_header[i], ip_header[i+1]}; // word = ip_header[i+1] << 8 | ip_header[i]
+                sum = sum + word;
+            end
+            
+            sum = sum + (sum >> 16);  // Add upper 16 bits to lower 16 bits
+            sum = ~sum[15:0];  // Take the lower 16 bits and invert them
+
+            // Store the result back in the IP header
+            ip_header[10] = sum[15:8];  // Upper 8 bits
+            ip_header[11] = sum[7:0];   // Lower 8 bits
+        end
+    end
+
+    integer remaining_payload_packets; 
+    integer next_packet_idx;
+    integer next_payload_idx;
+    integer pbi;
+    // Assign Ethernet frame, IP header, UDP header, and payload to output
+    always @(posedge m00_axis_aclk) begin
+        // Reassign static packet on reset or update
+        if ((m00_axis_aresetn == 1'b0) || (update_packet == 1'b1)) begin
 
             // Ethernet Header
-            udp_packet_int[0] = eth_dst_mac[0];
-            udp_packet_int[1] = eth_dst_mac[1];
-            udp_packet_int[2] = eth_dst_mac[2];
-            udp_packet_int[3] = eth_dst_mac[3];
-            udp_packet_int[4] = eth_dst_mac[4];
-            udp_packet_int[5] = eth_dst_mac[5];
+            udp_packet_int[0] <= eth_dst_mac[0];
+            udp_packet_int[1] <= eth_dst_mac[1];
+            udp_packet_int[2] <= eth_dst_mac[2];
+            udp_packet_int[3] <= eth_dst_mac[3];
+            udp_packet_int[4] <= eth_dst_mac[4];
+            udp_packet_int[5] <= eth_dst_mac[5];
 
-            udp_packet_int[6] = eth_src_mac[0];
-            udp_packet_int[7] = eth_src_mac[1];
-            udp_packet_int[8] = eth_src_mac[2];
-            udp_packet_int[9] = eth_src_mac[3];
-            udp_packet_int[10] = eth_src_mac[4];
-            udp_packet_int[11] = eth_src_mac[5];
+            udp_packet_int[6] <= eth_src_mac[0];
+            udp_packet_int[7] <= eth_src_mac[1];
+            udp_packet_int[8] <= eth_src_mac[2];
+            udp_packet_int[9] <= eth_src_mac[3];
+            udp_packet_int[10] <= eth_src_mac[4];
+            udp_packet_int[11] <= eth_src_mac[5];
 
-            udp_packet_int[12] = eth_type[0];
-            udp_packet_int[13] = eth_type[1];
+            udp_packet_int[12] <= eth_type[0];
+            udp_packet_int[13] <= eth_type[1];
 
             // IP Header
-            udp_packet_int[14] = ip_header[0];
-            udp_packet_int[15] = ip_header[1];
-            udp_packet_int[16] = ip_header[2];
-            udp_packet_int[17] = ip_header[3];
-            udp_packet_int[18] = ip_header[4];
-            udp_packet_int[19] = ip_header[5];
-            udp_packet_int[20] = ip_header[6];
-            udp_packet_int[21] = ip_header[7];
-            udp_packet_int[22] = ip_header[8];
-            udp_packet_int[23] = ip_header[9];
-            udp_packet_int[24] = ip_header[10];
-            udp_packet_int[25] = ip_header[11];
-            udp_packet_int[26] = ip_header[12];
-            udp_packet_int[27] = ip_header[13];
-            udp_packet_int[28] = ip_header[14];
-            udp_packet_int[29] = ip_header[15];
-            udp_packet_int[30] = ip_header[16];
-            udp_packet_int[31] = ip_header[17];
-            udp_packet_int[32] = ip_header[18];
-            udp_packet_int[33] = ip_header[19];
+            udp_packet_int[14] <= ip_header[0];
+            udp_packet_int[15] <= ip_header[1];
+            udp_packet_int[16] <= ip_header[2];
+            udp_packet_int[17] <= ip_header[3];
+            udp_packet_int[18] <= ip_header[4];
+            udp_packet_int[19] <= ip_header[5];
+            udp_packet_int[20] <= ip_header[6];
+            udp_packet_int[21] <= ip_header[7];
+            udp_packet_int[22] <= ip_header[8];
+            udp_packet_int[23] <= ip_header[9];
+            udp_packet_int[24] <= ip_header[10];
+            udp_packet_int[25] <= ip_header[11];
+            udp_packet_int[26] <= ip_header[12];
+            udp_packet_int[27] <= ip_header[13];
+            udp_packet_int[28] <= ip_header[14];
+            udp_packet_int[29] <= ip_header[15];
+            udp_packet_int[30] <= ip_header[16];
+            udp_packet_int[31] <= ip_header[17];
+            udp_packet_int[32] <= ip_header[18];
+            udp_packet_int[33] <= ip_header[19];
 
             // UDP Header
-            udp_packet_int[34] = udp_header[0];
-            udp_packet_int[35] = udp_header[1];
-            udp_packet_int[36] = udp_header[2];
-            udp_packet_int[37] = udp_header[3];
-            udp_packet_int[38] = udp_header[4];
-            udp_packet_int[39] = udp_header[5];
-            udp_packet_int[40] = udp_header[6];
-            udp_packet_int[41] = udp_header[7];
-
-            // Payload
-
-            // 0000 0000
-            udp_packet_int[42] = 8'hDE;
-            udp_packet_int[43] = 8'hAD;
-            udp_packet_int[44] = 8'hBE;
-            udp_packet_int[45] = 8'hEF;
-
-            // 0002 0000 0000 0000 055f 6970 7073 045f
-            udp_packet_int[46] = 8'hDE;
-            udp_packet_int[47] = 8'hAD;
-            udp_packet_int[48] = 8'hBE;
-            udp_packet_int[49] = 8'hEF;
-            udp_packet_int[50] = 8'hDE;
-            udp_packet_int[51] = 8'hAD;
-            udp_packet_int[52] = 8'hBE;
-            udp_packet_int[53] = 8'hEF;
-            udp_packet_int[54] = 8'hDE;
-            udp_packet_int[55] = 8'hAD;
-            udp_packet_int[56] = 8'hBE;
-            udp_packet_int[57] = 8'hEF;
-            udp_packet_int[58] = 8'hDE;
-            udp_packet_int[59] = 8'hAD;
-            udp_packet_int[60] = 8'hBE;
-            udp_packet_int[61] = 8'hEF;
-
-            // 7463 7005 6c6f 6361 6c00 000c 0001 045f
-            udp_packet_int[62] = 8'hDE;
-            udp_packet_int[63] = 8'hAD;
-            udp_packet_int[64] = 8'hBE;
-            udp_packet_int[65] = 8'hEF;
-            udp_packet_int[66] = 8'hDE;
-            udp_packet_int[67] = 8'hAD;
-            udp_packet_int[68] = 8'hBE;
-            udp_packet_int[69] = 8'hEF;
-            udp_packet_int[70] = 8'hDE;
-            udp_packet_int[71] = 8'hAD;
-            udp_packet_int[72] = 8'hBE;
-            udp_packet_int[73] = 8'hEF;
-            udp_packet_int[74] = 8'hDE;
-            udp_packet_int[75] = 8'hAD;
-            udp_packet_int[76] = 8'hBE;
-            udp_packet_int[77] = 8'hEF;
-
-            // 6970 70c0 1200 0c00 01                 
-            udp_packet_int[78] = 8'hDE;
-            udp_packet_int[79] = 8'hAD;
-            udp_packet_int[80] = 8'hBE;
-            udp_packet_int[81] = 8'hEF;
-            udp_packet_int[82] = 8'hDE;
-            udp_packet_int[83] = 8'hAD;
-            udp_packet_int[84] = 8'hBE;
-            udp_packet_int[85] = 8'hEF;
-            udp_packet_int[86] = 8'hDE;
+            udp_packet_int[34] <= udp_header[0];
+            udp_packet_int[35] <= udp_header[1];
+            udp_packet_int[36] <= udp_header[2];
+            udp_packet_int[37] <= udp_header[3];
+            udp_packet_int[38] <= udp_header[4];
+            udp_packet_int[39] <= udp_header[5];
+            udp_packet_int[40] <= udp_header[6];
+            udp_packet_int[41] <= udp_header[7];
 
             // 64-bit udp packet
-            udp_packet[0][63:0] = {udp_packet_int[7], udp_packet_int[6], udp_packet_int[5], udp_packet_int[4], udp_packet_int[3], udp_packet_int[2], udp_packet_int[1], udp_packet_int[0]};
-            udp_packet[1][63:0] = {udp_packet_int[15], udp_packet_int[14], udp_packet_int[13], udp_packet_int[12], udp_packet_int[11], udp_packet_int[10], udp_packet_int[9], udp_packet_int[8]};
-            udp_packet[2][63:0] = {udp_packet_int[23], udp_packet_int[22], udp_packet_int[21], udp_packet_int[20], udp_packet_int[19], udp_packet_int[18], udp_packet_int[17], udp_packet_int[16]};
-            udp_packet[3][63:0] = {udp_packet_int[31], udp_packet_int[30], udp_packet_int[29], udp_packet_int[28], udp_packet_int[27], udp_packet_int[26], udp_packet_int[25], udp_packet_int[24]};
-            udp_packet[4][63:0] = {udp_packet_int[39], udp_packet_int[38], udp_packet_int[37], udp_packet_int[36], udp_packet_int[35], udp_packet_int[34], udp_packet_int[33], udp_packet_int[32]};
-            udp_packet[5][63:0] = {udp_packet_int[47], udp_packet_int[46], udp_packet_int[45], udp_packet_int[44], udp_packet_int[43], udp_packet_int[42], udp_packet_int[41], udp_packet_int[40]};
-            udp_packet[6][63:0] = {udp_packet_int[55], udp_packet_int[54], udp_packet_int[53], udp_packet_int[52], udp_packet_int[51], udp_packet_int[50], udp_packet_int[49], udp_packet_int[48]};
-            udp_packet[7][63:0] = {udp_packet_int[63], udp_packet_int[62], udp_packet_int[61], udp_packet_int[60], udp_packet_int[59], udp_packet_int[58], udp_packet_int[57], udp_packet_int[56]};
-            udp_packet[8][63:0] = {udp_packet_int[71], udp_packet_int[70], udp_packet_int[69], udp_packet_int[68], udp_packet_int[67], udp_packet_int[66], udp_packet_int[65], udp_packet_int[64]};
-            udp_packet[9][63:0] = {udp_packet_int[79], udp_packet_int[78], udp_packet_int[77], udp_packet_int[76], udp_packet_int[75], udp_packet_int[74], udp_packet_int[73], udp_packet_int[72]};
-            udp_packet[10][63:0] = {8'd0, udp_packet_int[86], udp_packet_int[85], udp_packet_int[84], udp_packet_int[83], udp_packet_int[82], udp_packet_int[81], udp_packet_int[80]};
+            udp_packet[0][63:0] <= {udp_packet_int[7], udp_packet_int[6], udp_packet_int[5], udp_packet_int[4], udp_packet_int[3], udp_packet_int[2], udp_packet_int[1], udp_packet_int[0]};
+            udp_packet[1][63:0] <= {udp_packet_int[15], udp_packet_int[14], udp_packet_int[13], udp_packet_int[12], udp_packet_int[11], udp_packet_int[10], udp_packet_int[9], udp_packet_int[8]};
+            udp_packet[2][63:0] <= {udp_packet_int[23], udp_packet_int[22], udp_packet_int[21], udp_packet_int[20], udp_packet_int[19], udp_packet_int[18], udp_packet_int[17], udp_packet_int[16]};
+            udp_packet[3][63:0] <= {udp_packet_int[31], udp_packet_int[30], udp_packet_int[29], udp_packet_int[28], udp_packet_int[27], udp_packet_int[26], udp_packet_int[25], udp_packet_int[24]};
+            udp_packet[4][63:0] <= {udp_packet_int[39], udp_packet_int[38], udp_packet_int[37], udp_packet_int[36], udp_packet_int[35], udp_packet_int[34], udp_packet_int[33], udp_packet_int[32]};
+            udp_packet[5][63:0] <= {payload[2], payload[1], payload[0], udp_packet_int[41], udp_packet_int[40]};
+
+            next_packet_idx = 6; 
+            next_payload_idx = 3; 
+            for (i = 0; i < ((PAYLOAD_LENGTH - 3)/4); i = i + 1) begin
+                pbi = 4*i + next_payload_idx;
+                udp_packet[next_packet_idx + i][63:0] <= {payload[pbi+3], payload[pbi+2], payload[pbi+1], payload[pbi]};
+            end
+
+            next_packet_idx = next_packet_idx + i;
+            pbi = pbi + 4;
+            remaining_payload_packets = (PAYLOAD_LENGTH - 3) % 4;
+            // Initialize final packet to FF, will be ignored due to tkeep. 
+            udp_packet[next_packet_idx][63:0] <= 32'hFFFFFFFFFFFFFFFF;
+            // Overwrite with final bytes of payload
+            for (i = 0; i < remaining_payload_packets; i = i + 1) begin
+                case (i)
+                    0: udp_packet[next_packet_idx][15:0] <= payload[pbi];
+                    1: udp_packet[next_packet_idx][31:16] <= payload[pbi+1];
+                    2: udp_packet[next_packet_idx][47:32] <= payload[pbi+2];
+                    3: udp_packet[next_packet_idx][63:48] <= payload[pbi+3];
+                    default: begin
+                        // Do nothing
+                    end
+                endcase
+            end
         end
     end
 
     // Send UDP Packet over AXI bus
-    always @(posedge m00_axis_aclk or negedge m00_axis_aresetn) begin
+    always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn) begin
             counter <= 32'd0;
             sent_counter <= 32'd0;
             trigger_send <= 1'b0;
-            state <= 4'd0;
-            packet_index <= 4'd0;
+            state <= 16'd0;
+            packet_index <= 16'd0;
             tkeep_status <= 8'h00;
         end else begin
-            // Timer logic (simulate 1-second interval with a clock cycle counter)
-            //if (counter == 32'd100000000) begin  // Adjust to 100 MHz clock
-            if (counter == 32'd10000000) begin  // Adjust to 100 MHz clock
+            // Timer logic
+            if ((counter == packet_delay) && (packet_delay != 0)) begin  // Adjust to 100 MHz clock
                 trigger_send <= 1'b1;
                 counter <= 32'd0;
             end else begin
@@ -307,30 +304,29 @@ module udp_stream_v1_0 #
             // State machine to send the UDP packet over AXI4 Stream
             if (trigger_send) begin
                 // Reset state to start a new packet transmission
-                state <= 4'd0;
-                packet_index <= 4'd0;
+                state <= 16'd0;
+                packet_index <= 16'd0;
                 trigger_send <= 1'b0; // Clear the trigger after starting
                 tkeep_status <= 8'hFF;
             end else if (m00_axis_tvalid && m00_axis_tready) begin
                 // State machine to stream the UDP packet in 64-bit chunks
-                if (state == 4'd0) begin
+                if (state == 16'd0) begin
                     sent_counter <= sent_counter + 1;
                 end
-                // if (state < 4'd5) begin
-                if (state < 4'd10) begin
+                if (state < FINAL_STATE) begin
                     packet_index <= packet_index + 1;
                 end
-                if( state == 4'd09) begin
-                    tkeep_status <= 8'h7F;
+                if( state == (FINAL_STATE-1)) begin
+                    //Bug!
+                    tkeep_status <= 8'h03;
                 end
-                if( state == 4'd10) begin
+                if( state == FINAL_STATE) begin
                     tkeep_status <= 8'h00;
                 end
-                // if (state <= 4'd5) begin
-                if (state <= 4'd10) begin
+                if (state <= FINAL_STATE) begin
                     state <= state + 1;
                 end
-                if( state == 4'd11) begin
+                if( state == (FINAL_STATE+1)) begin
                     tkeep_status <= 8'h00;
                 end
             end
@@ -340,11 +336,11 @@ module udp_stream_v1_0 #
     // AXI4-Stream signals
     // assign m00_axis_tvalid = (state <= 3'd5);   // Valid when we're in the middle of sending the packet
     assign m00_axis_tkeep = tkeep_status;
-    assign m00_axis_tvalid = (state <= 4'd10);   // Valid when we're in the middle of sending the packet
+    assign m00_axis_tvalid = (state <= FINAL_STATE);   // Valid when we're in the middle of sending the packet
     assign m00_axis_tdata = udp_packet[packet_index];           // Transmit each 64-bit word of the UDP packet
-    assign m00_axis_tuser = 1'b0;
+    assign m00_axis_tuser = 8'b0;
     // assign m00_axis_tlast = (state == 3'd5) && m00_axis_tvalid; // Mark the last word of the packet
-    assign m00_axis_tlast = (state == 4'd10) && m00_axis_tvalid; // Mark the last word of the packet
+    assign m00_axis_tlast = (state == FINAL_STATE) && m00_axis_tvalid; // Mark the last word of the packet
 
     // AXI4-Lite signals
     assign s00_axi_awready = 1'b1;
@@ -364,27 +360,97 @@ module udp_stream_v1_0 #
             eth_dst_mac[3] = 8'hFF;
             eth_dst_mac[4] = 8'hFF;
             eth_dst_mac[5] = 8'hFF; // Broadcast MAC address
-        end else if (s00_axi_awvalid && s00_axi_wvalid && s00_axi_awaddr == 32'h0000_0000) begin
-            case (s00_axi_araddr)
-                32'h0000_000C: eth_dst_mac[0] <= s00_axi_wdata[7:0];
-                32'h0000_0010: eth_dst_mac[1] <= s00_axi_wdata[7:0];
-                32'h0000_0014: eth_dst_mac[2] <= s00_axi_wdata[7:0];
-                32'h0000_0018: eth_dst_mac[3] <= s00_axi_wdata[7:0];
-                32'h0000_001C: eth_dst_mac[4] <= s00_axi_wdata[7:0];
-                32'h0000_0020: eth_dst_mac[5] <= s00_axi_wdata[7:0];
+            eth_dst_mac_lsb[0] = 8'h00;
+            eth_dst_mac_lsb[1] = 8'h00;
+            eth_dst_mac_lsb[2] = 8'h00;
+            eth_dst_mac_lsb[3] = 8'h00;
+        end else if (s00_axi_awvalid && s00_axi_wvalid) begin
+            case (s00_axi_awaddr)
+                32'h0000_0008: packet_delay[31:0] <= s00_axi_wdata[31:0];
+                32'h0000_000C: begin
+                    // Dest MAC LSB
+                    eth_dst_mac_lsb[3] <= s00_axi_wdata[7:0];
+                    eth_dst_mac_lsb[2] <= s00_axi_wdata[15:8];
+                    eth_dst_mac_lsb[1] <= s00_axi_wdata[23:16];
+                    eth_dst_mac_lsb[0] <= s00_axi_wdata[31:24];
+                end
+                32'h0000_0010: begin 
+                    // Dest MAC MSB - Update header
+                    eth_dst_mac[1] <= s00_axi_wdata[7:0];
+                    eth_dst_mac[0] <= s00_axi_wdata[15:8];
+
+                    eth_dst_mac[2] <= eth_dst_mac_lsb[0];
+                    eth_dst_mac[3] <= eth_dst_mac_lsb[1];
+                    eth_dst_mac[4] <= eth_dst_mac_lsb[2];
+                    eth_dst_mac[5] <= eth_dst_mac_lsb[3];
+                    update_packet = 1'b1;
+                end
+                32'h0000_0014: begin 
+                    // Source IP
+                    ip_header[15][7:0] <= s00_axi_wdata[7:0];
+                    ip_header[14][7:0] <= s00_axi_wdata[15:8];
+                    ip_header[13][7:0] <= s00_axi_wdata[23:16]; 
+                    ip_header[12][7:0] <= s00_axi_wdata[31:24]; 
+                    update_packet = 1'b1;
+                end
+                32'h0000_0018: begin 
+                    // Destination IP
+                    ip_header[19][7:0] <= s00_axi_wdata[7:0];    
+                    ip_header[18][7:0] <= s00_axi_wdata[15:8];
+                    ip_header[17][7:0] <= s00_axi_wdata[23:16];
+                    ip_header[16][7:0] <= s00_axi_wdata[31:24];  
+                    update_packet = 1'b1;
+                end
+                32'h0000_001C: begin 
+                    // Source Port
+                    udp_header[1][7:0] <= s00_axi_wdata[7:0];
+                    udp_header[0][7:0] <= s00_axi_wdata[15:8];
+                    update_packet = 1'b1;
+                end
+                32'h0000_0020: begin 
+                    // Destination Port
+                    udp_header[3][7:0] <= s00_axi_wdata[7:0];
+                    udp_header[2][7:0] <= s00_axi_wdata[15:8];
+                    update_packet = 1'b1;
+                end
+                default: begin
+                    // Do nothing
+                end
             endcase
         end
     end
 
     // AXI4 Read Data (output the register value as 32-bit)
-    always @(posedge s00_axi_aclk or negedge s00_axi_aresetn) begin
+    always @(posedge s00_axi_aclk) begin
         if (~s00_axi_aresetn) begin
             s00_axi_rdata <= 32'b0;
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
                 32'h0000_0000: s00_axi_rdata = sent_counter; 
-                32'h0000_0004: s00_axi_rdata = counter;       
-                32'h0000_0008: s00_axi_rdata = sum;           
+                32'h0000_0004: s00_axi_rdata = state;       
+                32'h0000_0008: s00_axi_rdata = packet_delay;           
+                32'h0000_000C: begin
+                    s00_axi_rdata = {eth_dst_mac[2], eth_dst_mac[3], eth_dst_mac[4], eth_dst_mac[5]};
+                end
+                32'h0000_0010: begin 
+                    s00_axi_rdata = {8'b0, 8'b0, eth_dst_mac[0], eth_dst_mac[1]};
+                end
+                32'h0000_0014: begin 
+                    // Source IP
+                    s00_axi_rdata = {ip_header[12], ip_header[13], ip_header[14], ip_header[15]};
+                end
+                32'h0000_0018: begin 
+                    // Destination IP
+                    s00_axi_rdata = {ip_header[16], ip_header[17], ip_header[18], ip_header[19]};
+                end
+                32'h0000_001C: begin 
+                    // Source Port
+                    s00_axi_rdata = {8'b0, 8'b0, udp_header[0], udp_header[1]};
+                end
+                32'h0000_0020: begin 
+                    // Destination Port
+                    s00_axi_rdata = {8'b0, 8'b0, udp_header[2], udp_header[3]};
+                end
                 default: s00_axi_rdata = 32'b0;
             endcase
         end
@@ -392,7 +458,7 @@ module udp_stream_v1_0 #
 
     // AXI4 Read Data Valid
     reg rvalid_reg;
-    always @(posedge s00_axi_aclk or negedge s00_axi_aresetn) begin
+    always @(posedge s00_axi_aclk) begin
         if (~s00_axi_aresetn) begin
             rvalid_reg <= 1'b0;
         end else begin
