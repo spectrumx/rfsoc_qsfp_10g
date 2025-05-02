@@ -8,10 +8,7 @@ module udp_stream_v1_0 #
 
     // Parameters of Axi Master Bus Interface M00_AXIS
     parameter integer C_M00_AXIS_TDATA_WIDTH = 64,
-    parameter integer C_M00_AXIS_TKEEP_WIDTH = 8,
-
-    parameter integer PAYLOAD_LENGTH = 512,
-    parameter integer FINAL_STATE = ((PAYLOAD_LENGTH - 3)/4) + 6
+    parameter integer C_M00_AXIS_TKEEP_WIDTH = 8
 )
 (
     // Ports of Axi Slave Bus Interface S00_AXI
@@ -48,6 +45,16 @@ module udp_stream_v1_0 #
     input wire m00_axis_tready
 );
 
+    // Local params
+    localparam integer PAYLOAD_WORDS = 4128; // Payload length (in 16-bit words)
+    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2);     // 8 bytes (UDP header) + 2 bytes/word * payload_length
+    localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;      // 20 bytes (IP header) + UDP length
+    localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;            // 14 bytes (Ethernet header) + IP length
+    localparam integer LAST_AXIS_LENGTH = TOTAL_HEADER_LENGTH % 8;      // 2
+    localparam integer LAST_PAYLOAD_WORDS = LAST_AXIS_LENGTH / 2;   // 1
+    localparam integer LAST_TKEEP = (1 << (LAST_PAYLOAD_WORDS * 2)) - 1;
+    localparam integer FINAL_STATE = ((PAYLOAD_WORDS - 3)/4) + 6;       // States to tx (words + headers)
+
     // Define the UDP packet 
     reg [7:0] udp_packet_int[0:41];  // Ethernet frame, IP header, UDP header
     reg [63:0] udp_packet[0:FINAL_STATE];     // 22 words for 64-bit chunks
@@ -58,6 +65,8 @@ module udp_stream_v1_0 #
     reg [7:0] eth_type[1:0];         // EtherType (e.g., 0x0800 for IPv4)
 
     // Initial IP Header Parts 
+    reg [15:0] ip_header_length;
+    reg [15:0] udp_header_length;
     reg [7:0] ip_header[0:19];       // Array to store 8-bit words of IP header
     reg [7:0] udp_header[0:7];       // Array to store 8-bit words of UDP header
     reg [31:0] sum;                  // IP Checksum
@@ -66,7 +75,7 @@ module udp_stream_v1_0 #
     reg [7:0] eth_dst_mac_lsb[3:0]; // Temp storage for Destination MAC LSB
 
     // Payload
-    reg [15:0] payload[PAYLOAD_LENGTH-1 : 0];  // 512 short ints = 1024 bytes
+    reg [15:0] payload[PAYLOAD_WORDS-1 : 0];  // 16-bit words
 
     // State machine signals
     reg [15:0] state;                 // Current state (0 to 5 to traverse the packet)
@@ -80,6 +89,12 @@ module udp_stream_v1_0 #
     reg [31:0] sent_counter;         // 32-bit counter for sent packets
     reg [31:0] packet_delay;        // Counter value to send packet
     reg trigger_send;                // Signal to trigger sending the packet
+
+    reg [7:0] user_reset;                 // State of user reset
+
+    //////////////////////////////////////////////////////////////////////////
+    // Generate UDP Stream
+    //////////////////////////////////////////////////////////////////////////
 
     // Initialize Ethernet frame, IP header, UDP header
     initial begin
@@ -104,8 +119,8 @@ module udp_stream_v1_0 #
         // IP Header
         ip_header[0][7:0] = 8'h45;   // Version (4) + Header Length (5)
         ip_header[1][7:0] = 8'h00;
-        ip_header[2][7:0] = 8'h00;   // Total Length 20 + 8 + Payload
-        ip_header[3][7:0] = 8'h9C;   // 156 (9C)
+        ip_header[2][7:0] = IP_HEADER_LENGTH[15:8]; // Length MSB
+        ip_header[3][7:0] = IP_HEADER_LENGTH[7:0];   // Length LSB
         ip_header[4][7:0] = 8'h00;   // Identification (0)
         ip_header[5][7:0] = 8'h01;
         ip_header[6][7:0] = 8'h40;   // Flags and Fragment Offset
@@ -128,8 +143,8 @@ module udp_stream_v1_0 #
         udp_header[1][7:0] = 8'hE5;
         udp_header[2][7:0] = 8'hEA;   // Dest port 60133
         udp_header[3][7:0] = 8'hE5;
-        udp_header[4][7:0] = 8'h00;   // Length 8 + Payload
-        udp_header[5][7:0] = 8'h88;   // 136 (88)
+        udp_header[4][7:0] = UDP_HEADER_LENGTH[15:8];  // UDP Length MSB
+        udp_header[5][7:0] = UDP_HEADER_LENGTH[7:0];   // UDP Length LSB
         udp_header[6][7:0] = 8'h00;   // Checksum placeholder 
         udp_header[7][7:0] = 8'h00;   // 
     end
@@ -137,31 +152,21 @@ module udp_stream_v1_0 #
     // Assign payload
     integer i;
     integer incr;
-    reg[15:0] ip_header_length;
-    reg[15:0] udp_header_length;
     initial begin
-        ip_header_length[15:0] = 20 + 8 + 2*PAYLOAD_LENGTH;
-        udp_header_length[15:0] = 2*PAYLOAD_LENGTH;
+        incr = 0;
 
-        ip_header[2][7:0] = ip_header_length >> 8;
-        ip_header[3][7:0] = ip_header_length & 16'h00FF;
-        udp_header[4][7:0] = udp_header_length >> 8;
-        udp_header[5][7:0] = udp_header_length & 16'h00FF;
-
-        payload[0] = 0;
-        payload[1] = 255;
-        incr = 1;
-
-        for (i = 2; i < PAYLOAD_LENGTH; i = i + 2) begin
+        for (i = 2; i < PAYLOAD_WORDS; i = i + 2) begin
             payload[i] = incr; 
-            payload[i+1] = 255 - incr;
+            payload[i+1] = 16'hFFFF - incr;
             incr = incr + 1;
         end
     end
 
+    // Initialize state
     initial begin
         update_packet = 1'b0;
-        packet_delay = 32'd10000000;
+        packet_delay = 32'd9216; // ~2Gbps
+        user_reset = 8'b0;
     end
 
     // Calculate IP Checksum
@@ -188,7 +193,6 @@ module udp_stream_v1_0 #
         end
     end
 
-    integer remaining_payload_packets; 
     integer next_packet_idx;
     integer next_payload_idx;
     integer pbi;
@@ -196,7 +200,6 @@ module udp_stream_v1_0 #
     always @(posedge m00_axis_aclk) begin
         // Reassign static packet on reset or update
         if ((m00_axis_aresetn == 1'b0) || (update_packet == 1'b1)) begin
-
             // Ethernet Header
             udp_packet_int[0] <= eth_dst_mac[0];
             udp_packet_int[1] <= eth_dst_mac[1];
@@ -247,7 +250,12 @@ module udp_stream_v1_0 #
             udp_packet_int[40] <= udp_header[6];
             udp_packet_int[41] <= udp_header[7];
 
-            // 64-bit udp packet
+            // First word of payload is packet counter
+            payload[0] <= sent_counter[15:0]; 
+            payload[1] <= sent_counter[31:16]; 
+
+            // Assign 64-bit udp packet
+            // Assumes payload is a least 4 words long
             udp_packet[0][63:0] <= {udp_packet_int[7], udp_packet_int[6], udp_packet_int[5], udp_packet_int[4], udp_packet_int[3], udp_packet_int[2], udp_packet_int[1], udp_packet_int[0]};
             udp_packet[1][63:0] <= {udp_packet_int[15], udp_packet_int[14], udp_packet_int[13], udp_packet_int[12], udp_packet_int[11], udp_packet_int[10], udp_packet_int[9], udp_packet_int[8]};
             udp_packet[2][63:0] <= {udp_packet_int[23], udp_packet_int[22], udp_packet_int[21], udp_packet_int[20], udp_packet_int[19], udp_packet_int[18], udp_packet_int[17], udp_packet_int[16]};
@@ -255,33 +263,36 @@ module udp_stream_v1_0 #
             udp_packet[4][63:0] <= {udp_packet_int[39], udp_packet_int[38], udp_packet_int[37], udp_packet_int[36], udp_packet_int[35], udp_packet_int[34], udp_packet_int[33], udp_packet_int[32]};
             udp_packet[5][63:0] <= {payload[2], payload[1], payload[0], udp_packet_int[41], udp_packet_int[40]};
 
-            next_packet_idx = 6; 
-            next_payload_idx = 3; 
-            for (i = 0; i < ((PAYLOAD_LENGTH - 3)/4); i = i + 1) begin
+            next_packet_idx = 6;    // Next 64-bit AXIS transaction index
+            next_payload_idx = 3;   // Next payload word index
+            for (i = 0; i < ((PAYLOAD_WORDS - 3)/4); i = i + 1) begin
                 pbi = 4*i + next_payload_idx;
                 udp_packet[next_packet_idx + i][63:0] <= {payload[pbi+3], payload[pbi+2], payload[pbi+1], payload[pbi]};
             end
 
-            next_packet_idx = next_packet_idx + i;
-            pbi = pbi + 4;
-            remaining_payload_packets = (PAYLOAD_LENGTH - 3) % 4;
+            pbi = pbi + 4; // Increment payload word index
+            next_packet_idx = next_packet_idx + i; // Increment packet index
+
             // Initialize final packet to FF, will be ignored due to tkeep. 
-            udp_packet[next_packet_idx][63:0] <= 32'hFFFFFFFFFFFFFFFF;
+            udp_packet[next_packet_idx][63:0] <= 64'hFFFFFFFFFFFFFFFF;
+
             // Overwrite with final bytes of payload
-            for (i = 0; i < remaining_payload_packets; i = i + 1) begin
+            for (i = 0; i < LAST_PAYLOAD_WORDS; i = i + 1) begin
                 case (i)
                     0: udp_packet[next_packet_idx][15:0] <= payload[pbi];
                     1: udp_packet[next_packet_idx][31:16] <= payload[pbi+1];
                     2: udp_packet[next_packet_idx][47:32] <= payload[pbi+2];
                     3: udp_packet[next_packet_idx][63:48] <= payload[pbi+3];
                     default: begin
-                        // Do nothing
                     end
                 endcase
             end
         end
     end
 
+    //////////////////////////////////////////////////////////////////////////
+    // AXI4 Stream Data Bus
+    //////////////////////////////////////////////////////////////////////////
     // Send UDP Packet over AXI bus
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn) begin
@@ -293,7 +304,9 @@ module udp_stream_v1_0 #
             tkeep_status <= 8'h00;
         end else begin
             // Timer logic
-            if ((counter == packet_delay) && (packet_delay != 0)) begin  // Adjust to 100 MHz clock
+            if ((counter == packet_delay) 
+                && (packet_delay != 0)
+                && (user_reset == 0)) begin  
                 trigger_send <= 1'b1;
                 counter <= 32'd0;
             end else begin
@@ -308,48 +321,53 @@ module udp_stream_v1_0 #
                 packet_index <= 16'd0;
                 trigger_send <= 1'b0; // Clear the trigger after starting
                 tkeep_status <= 8'hFF;
+                update_packet = 1'b1;
             end else if (m00_axis_tvalid && m00_axis_tready) begin
                 // State machine to stream the UDP packet in 64-bit chunks
                 if (state == 16'd0) begin
                     sent_counter <= sent_counter + 1;
+                    update_packet = 1'b0; // Reset update packet request
                 end
+                // Increment packet index
                 if (state < FINAL_STATE) begin
                     packet_index <= packet_index + 1;
                 end
+                // Prior to final AXIS transacation, set tkeep
                 if( state == (FINAL_STATE-1)) begin
-                    //Bug!
-                    tkeep_status <= 8'h03;
+                    tkeep_status <= LAST_TKEEP[7:0]; 
                 end
-                if( state == FINAL_STATE) begin
+                // Reset tkeep
+                if(state == FINAL_STATE) begin
                     tkeep_status <= 8'h00;
                 end
+                // Increment state
                 if (state <= FINAL_STATE) begin
                     state <= state + 1;
                 end
-                if( state == (FINAL_STATE+1)) begin
+                if(state == (FINAL_STATE+1)) begin
                     tkeep_status <= 8'h00;
                 end
             end
         end
     end
 
-    // AXI4-Stream signals
-    // assign m00_axis_tvalid = (state <= 3'd5);   // Valid when we're in the middle of sending the packet
+    // AXI4-Stream control signals
     assign m00_axis_tkeep = tkeep_status;
     assign m00_axis_tvalid = (state <= FINAL_STATE);   // Valid when we're in the middle of sending the packet
     assign m00_axis_tdata = udp_packet[packet_index];           // Transmit each 64-bit word of the UDP packet
     assign m00_axis_tuser = 8'b0;
-    // assign m00_axis_tlast = (state == 3'd5) && m00_axis_tvalid; // Mark the last word of the packet
     assign m00_axis_tlast = (state == FINAL_STATE) && m00_axis_tvalid; // Mark the last word of the packet
 
-    // AXI4-Lite signals
+    //////////////////////////////////////////////////////////////////////////
+    // AXI4-Lite Control Bus
+    //////////////////////////////////////////////////////////////////////////
+
     assign s00_axi_awready = 1'b1;
     assign s00_axi_wready = 1'b1;
     assign s00_axi_bresp = 2'b00;
     assign s00_axi_bvalid = s00_axi_wvalid;
     assign s00_axi_arready = 1'b1;
     assign s00_axi_rresp = 2'b00;
-    //assign s00_axi_rvalid = s00_axi_arvalid;
 
     // Write Logic: when AXI4 Write transaction occurs, write the data to char_reg
     always @(posedge s00_axi_aclk or negedge s00_axi_aresetn) begin
@@ -366,6 +384,7 @@ module udp_stream_v1_0 #
             eth_dst_mac_lsb[3] = 8'h00;
         end else if (s00_axi_awvalid && s00_axi_wvalid) begin
             case (s00_axi_awaddr)
+                32'h0000_0000: user_reset[7:0] <= s00_axi_wdata[7:0];
                 32'h0000_0008: packet_delay[31:0] <= s00_axi_wdata[31:0];
                 32'h0000_000C: begin
                     // Dest MAC LSB
@@ -383,7 +402,6 @@ module udp_stream_v1_0 #
                     eth_dst_mac[3] <= eth_dst_mac_lsb[1];
                     eth_dst_mac[4] <= eth_dst_mac_lsb[2];
                     eth_dst_mac[5] <= eth_dst_mac_lsb[3];
-                    update_packet = 1'b1;
                 end
                 32'h0000_0014: begin 
                     // Source IP
@@ -391,7 +409,6 @@ module udp_stream_v1_0 #
                     ip_header[14][7:0] <= s00_axi_wdata[15:8];
                     ip_header[13][7:0] <= s00_axi_wdata[23:16]; 
                     ip_header[12][7:0] <= s00_axi_wdata[31:24]; 
-                    update_packet = 1'b1;
                 end
                 32'h0000_0018: begin 
                     // Destination IP
@@ -399,19 +416,16 @@ module udp_stream_v1_0 #
                     ip_header[18][7:0] <= s00_axi_wdata[15:8];
                     ip_header[17][7:0] <= s00_axi_wdata[23:16];
                     ip_header[16][7:0] <= s00_axi_wdata[31:24];  
-                    update_packet = 1'b1;
                 end
                 32'h0000_001C: begin 
                     // Source Port
                     udp_header[1][7:0] <= s00_axi_wdata[7:0];
                     udp_header[0][7:0] <= s00_axi_wdata[15:8];
-                    update_packet = 1'b1;
                 end
                 32'h0000_0020: begin 
                     // Destination Port
                     udp_header[3][7:0] <= s00_axi_wdata[7:0];
                     udp_header[2][7:0] <= s00_axi_wdata[15:8];
-                    update_packet = 1'b1;
                 end
                 default: begin
                     // Do nothing
@@ -426,8 +440,8 @@ module udp_stream_v1_0 #
             s00_axi_rdata <= 32'b0;
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
-                32'h0000_0000: s00_axi_rdata = sent_counter; 
-                32'h0000_0004: s00_axi_rdata = state;       
+                32'h0000_0000: s00_axi_rdata = user_reset; 
+                32'h0000_0004: s00_axi_rdata = sent_counter;       
                 32'h0000_0008: s00_axi_rdata = packet_delay;           
                 32'h0000_000C: begin
                     s00_axi_rdata = {eth_dst_mac[2], eth_dst_mac[3], eth_dst_mac[4], eth_dst_mac[5]};
