@@ -134,6 +134,7 @@ module adc_to_udp_stream_v1_0_tb;
     // Test logic
     integer i;
     bit tvalid_high = 0;
+    integer input_stream_data;
 
     initial begin
         // Initialize incoming AXIS signals
@@ -142,6 +143,7 @@ module adc_to_udp_stream_v1_0_tb;
 
         // Initialize tready to high
         m00_axis_tready = 1'b1;
+        input_stream_data = 0;
 
         // Wait for reset deassertion
         @(posedge m00_axis_aresetn);
@@ -152,10 +154,12 @@ module adc_to_udp_stream_v1_0_tb;
             @(posedge s01_axis_aclk);
             while (!s01_axis_tready) @(posedge s01_axis_aclk);
             s01_axis_tvalid = 1;
-            s01_axis_tdata = $random; 
+            s01_axis_tdata = input_stream_data; //$random; 
+            input_stream_data = input_stream_data + 1;
             
-            @(posedge s01_axis_aclk); // Disable if tready not high
-            s01_axis_tvalid = 0; // Deassert valid
+            if(!s01_axis_tready) begin
+                s01_axis_tvalid = 0; // Deassert valid
+            end
         end
 
         $display("Testbench finished successfully");

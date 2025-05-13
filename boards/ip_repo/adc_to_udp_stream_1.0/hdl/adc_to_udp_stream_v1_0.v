@@ -67,61 +67,33 @@ module adc_to_udp_stream_v1_0 #
 
     // Local params
     localparam integer PAYLOAD_WORDS = 4128;                            // Payload length (in 16-bit words)
+    localparam integer FIFO_BUFFER = 8;
+    localparam integer FIFO_LENGTH = PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
     localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2);     // 8 bytes (UDP header) + 2 bytes/word * payload_length
     localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;      // 20 bytes (IP header) + UDP length
     localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;     // 14 bytes (Ethernet header) + IP length
-    localparam integer LAST_AXIS_LENGTH = TOTAL_HEADER_LENGTH % 8;      // 2
-    localparam integer LAST_PAYLOAD_WORDS = LAST_AXIS_LENGTH / 2;       // 1
-    localparam integer LAST_TKEEP = (1 << (LAST_PAYLOAD_WORDS * 2)) - 1;
-    localparam integer FINAL_STATE = ((PAYLOAD_WORDS - 3)/4) + 6;       // States to tx (words + headers)
+
+    localparam integer HEADER_STATE = 6;                                  // States to tx (words + headers)
+    localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;  // States to tx (words + headers)
 
     localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;          // 16-bit words
     localparam integer AXIS_PER_BUFFER = PAYLOAD_WORDS / WORDS_PER_AXIS;     // Ping-pong buffer size
 
+    localparam integer FIFO_READ_DELAY = 2;
+
     // Ping-pong buffer 
-    reg [15:0] input_buffer [1:0][PAYLOAD_WORDS-1:0];
-    reg [31:0] write_pointer;
-    reg buffer_select;
-    reg buffer_filled;
-    wire [15:0] input_buffer0_0;
-    wire [15:0] input_buffer0_1;
-    wire [15:0] input_buffer0_2;
-    wire [15:0] input_buffer0_3;
-    wire [15:0] input_buffer1_0;
-    wire [15:0] input_buffer1_1;
-    wire [15:0] input_buffer1_2;
-    wire [15:0] input_buffer1_3;
+    wire buffer_select;
 
-    wire [15:0] input_buffer0_end0;
-    wire [15:0] input_buffer0_end1;
-    wire [15:0] input_buffer0_end2;
-    wire [15:0] input_buffer0_end3;
-    wire [15:0] input_buffer1_end0;
-    wire [15:0] input_buffer1_end1;
-    wire [15:0] input_buffer1_end2;
-    wire [15:0] input_buffer1_end3;
-
-    assign input_buffer0_0 = input_buffer[0][0];
-    assign input_buffer0_1 = input_buffer[0][1];
-    assign input_buffer0_2 = input_buffer[0][2];
-    assign input_buffer0_3 = input_buffer[0][3];
-    assign input_buffer1_0 = input_buffer[1][0];
-    assign input_buffer1_1 = input_buffer[1][1];
-    assign input_buffer1_2 = input_buffer[1][2];
-    assign input_buffer1_3 = input_buffer[1][3];
-
-    assign input_buffer0_end0 = input_buffer[0][PAYLOAD_WORDS-4];
-    assign input_buffer0_end1 = input_buffer[0][PAYLOAD_WORDS-3];
-    assign input_buffer0_end2 = input_buffer[0][PAYLOAD_WORDS-2];
-    assign input_buffer0_end3 = input_buffer[0][PAYLOAD_WORDS-1];
-    assign input_buffer1_end0 = input_buffer[1][PAYLOAD_WORDS-4];
-    assign input_buffer1_end1 = input_buffer[1][PAYLOAD_WORDS-3];
-    assign input_buffer1_end2 = input_buffer[1][PAYLOAD_WORDS-2];
-    assign input_buffer1_end3 = input_buffer[1][PAYLOAD_WORDS-1];
+    wire fifo_0_write_en;
+    wire fifo_1_write_en;
+    wire fifo_0_read_en;
+    wire fifo_1_read_en;
+    wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_0_out_data;
+    wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_1_out_data;
 
     // Define the UDP packet 
     reg [7:0] udp_packet_int[0:41];             // Ethernet frame, IP header, UDP header
-    reg [63:0] udp_packet[0:FINAL_STATE];       // 22 words for 64-bit chunks
+    reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet[0:FINAL_STATE];       // 22 words for 64-bit chunks
 
     // Ethernet Header
     reg [7:0] eth_dst_mac[5:0];                 // Destination MAC address (6 bytes)
@@ -135,31 +107,61 @@ module adc_to_udp_stream_v1_0 #
     reg [7:0] udp_header[0:7];                  // Array to store 8-bit words of UDP header
     reg [31:0] sum;                             // IP Checksum
     reg [15:0] word;                            // 16-bit word for summing
-    reg update_packet;
     reg [7:0] eth_dst_mac_lsb[3:0];             // Temp storage for Destination MAC LSB
+    reg start_udp_header;
+    reg in_udp_header;
+    wire update_packet;
 
     // State machine signals
-    reg [15:0] packet_state;                    // Current state (0 to 5 to traverse the packet)
-    reg [15:0] packet_index;                    // Index for each 64-bit word in the UDP packet
+    reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
 
     // AXI bus signals
-    reg [7:0] tkeep_status;                     // Signal to indicate valid bytes
+    reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet_axis_data;           
 
     // Timer to trigger packet transmission every 100ms
     reg [31:0] sent_counter;                    // 32-bit counter for sent packets
     reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
     reg [7:0] user_reset;                       // State of user reset
 
+    // FIFO
+    wire fifo_0_full;
+    wire fifo_1_full;
+    wire fifo_0_empty;
+    wire fifo_1_empty;
+    reg fifo_0_reset;
+    reg fifo_1_reset;
+    wire fifo_0_rst_busy;
+    wire fifo_1_rst_busy;
+
+    reg fifo_0_full_reg;
+    reg fifo_1_full_reg;
+    reg fifo_0_full_delay;
+    reg fifo_1_full_delay;
+    wire fifo_0_full_trigger;
+    wire fifo_1_full_trigger;
+    reg fifo_0_read_en_latched;
+    reg fifo_1_read_en_latched;
+
+    reg fifo_0_rst_busy_latched;
+    reg fifo_1_rst_busy_latched;
+
+    wire fifo_0_rst_busy_combined;
+    wire fifo_1_rst_busy_combined;
+
+    reg fifo_0_empty_latched;
+    reg fifo_1_empty_latched;
+
     //////////////////////////////////////////////////////////////////////////
     // Ping-pong buffer for incoming ADC samples
+    // Use block ram FIFO
     //////////////////////////////////////////////////////////////////////////
-
     always @(posedge s01_axis_aclk or negedge s01_axis_aresetn) begin
         if (!s01_axis_aresetn) begin
-            write_pointer <= 0;
-            buffer_select <= 0;
-            buffer_filled <= 0;
             received_counter <= 0;
+            fifo_0_rst_busy_latched <= 0;
+            fifo_1_rst_busy_latched <= 0;
+            fifo_0_reset <= 1;
+            fifo_1_reset <= 1;
         end else begin
             // Write data to the appropriate buffer
             // Increment counter
@@ -167,32 +169,136 @@ module adc_to_udp_stream_v1_0 #
                 received_counter <= received_counter + 1;
             end
 
-            // When full flag buffer_filled and select other buffer
-            if (s01_axis_tvalid && !buffer_select) begin
-                input_buffer[0][4*write_pointer] <= s01_axis_tdata[15:0];
-                input_buffer[0][4*write_pointer + 1] <= s01_axis_tdata[31:16];
-                input_buffer[0][4*write_pointer + 2] <= s01_axis_tdata[47:32];
-                input_buffer[0][4*write_pointer + 3] <= s01_axis_tdata[63:48];
-                write_pointer <= write_pointer + 1;
-                if (write_pointer >= AXIS_PER_BUFFER-1) begin
-                    buffer_select <= 1;
-                    write_pointer <= 0;
-                    buffer_filled <= 1;
-                end
-            end else if (s01_axis_tvalid) begin
-                input_buffer[1][4*write_pointer] <= s01_axis_tdata[15:0];
-                input_buffer[1][4*write_pointer + 1] <= s01_axis_tdata[31:16];
-                input_buffer[1][4*write_pointer + 2] <= s01_axis_tdata[47:32];
-                input_buffer[1][4*write_pointer + 3] <= s01_axis_tdata[63:48];
-                write_pointer <= write_pointer + 1;
-                if (write_pointer >= AXIS_PER_BUFFER-1) begin
-                    buffer_select <= 0;
-                    write_pointer <= 0;
-                    buffer_filled <= 1;
-                end
+            // Latch reset busy to delay extra cycle
+            fifo_0_rst_busy_latched <= fifo_0_rst_busy;
+            fifo_1_rst_busy_latched <= fifo_1_rst_busy;
+
+            fifo_0_empty_latched <= fifo_0_empty;
+            fifo_1_empty_latched <= fifo_1_empty;
+
+            if (!fifo_0_empty_latched && fifo_0_empty) begin
+                fifo_0_reset <= 1;
+            end else if(fifo_0_reset) begin
+                fifo_0_reset <= 0;
+            end
+
+            if (!fifo_1_empty_latched && fifo_1_empty) begin
+                fifo_1_reset <= 1;
+            end else if(fifo_1_reset) begin
+                fifo_1_reset <= 0;
             end
         end
     end
+
+    // When full select other buffer
+    assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
+    assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
+    assign fifo_0_rst_busy = fifo_0_wr_rst_busy || fifo_0_rd_rst_busy;
+    assign fifo_1_rst_busy = fifo_1_wr_rst_busy || fifo_1_rd_rst_busy;
+    assign buffer_select = fifo_0_full | fifo_0_full_reg;
+    assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && !fifo_0_rst_combined && !buffer_select;
+    assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && !fifo_1_rst_combined && buffer_select;
+
+    // Flag fifo full transition for a single cycle
+    always @(posedge m00_axis_aclk) begin
+        if (!m00_axis_aresetn) begin
+            fifo_0_full_reg <= 1'b0;
+            fifo_0_full_delay <= 1'b0;
+            fifo_1_full_reg <= 1'b0;
+            fifo_1_full_delay <= 1'b0;
+        end else begin
+            if(fifo_0_full) begin
+                fifo_0_full_reg <= 1'b1;
+                if (!fifo_1_full) begin
+                    fifo_1_full_reg <= 1'b0;
+                end
+            end
+            if(fifo_1_full) begin
+                fifo_1_full_reg <= 1'b1;
+                if (!fifo_0_full) begin
+                    fifo_0_full_reg <= 1'b0;
+                end
+            end
+
+            fifo_0_full_delay <= fifo_0_full_reg;
+            fifo_1_full_delay <= fifo_1_full_reg;
+        end
+    end
+
+    assign fifo_0_full_trigger = fifo_0_full_reg && !fifo_0_full_delay;
+    assign fifo_1_full_trigger = fifo_1_full_reg && !fifo_1_full_delay;
+    assign update_packet = fifo_0_full_trigger || fifo_1_full_trigger;
+
+    wire [11:0] fifo_0_wr_count;
+    wire [11:0] fifo_1_wr_count;
+    wire [11:0] fifo_0_rd_count;
+    wire [11:0] fifo_1_rd_count;
+    wire fifo_0_wr_rst_busy;
+    wire fifo_0_rd_rst_busy;
+    wire fifo_1_wr_rst_busy;
+    wire fifo_1_rd_rst_busy;
+
+    xpm_fifo_async #(
+        .FIFO_MEMORY_TYPE("block"),    // Use BRAM
+        .ECC_MODE("no_ecc"),
+        .FIFO_WRITE_DEPTH(FIFO_LENGTH),
+        .WRITE_DATA_WIDTH(C_S01_AXIS_TDATA_WIDTH),
+        .READ_DATA_WIDTH(C_M00_AXIS_TDATA_WIDTH),
+        .WR_DATA_COUNT_WIDTH(12),
+        .RD_DATA_COUNT_WIDTH(12),
+        .PROG_FULL_THRESH(FIFO_LENGTH-FIFO_BUFFER),
+        .PROG_EMPTY_THRESH(1)
+    ) fifo_0_inst (
+        .rst(fifo_0_reset),
+
+        // Write side
+        .wr_clk(s01_axis_aclk),
+        .wr_en(fifo_0_write_en),
+        .din(s01_axis_tdata),
+        // .full(fifo_0_full),
+        .prog_full(fifo_0_full),
+        .wr_data_count(fifo_0_wr_count),
+        .wr_rst_busy(fifo_0_wr_rst_busy),
+
+        // Read side
+        .rd_clk(m00_axis_aclk),
+        .rd_en(fifo_0_read_en),
+        .dout(fifo_0_out_data),
+        .empty(fifo_0_empty),
+        .rd_data_count(fifo_0_rd_count),
+        .rd_rst_busy(fifo_0_rd_rst_busy)
+    );
+
+    xpm_fifo_async #(
+        .FIFO_MEMORY_TYPE("block"),    // Use BRAM
+        .ECC_MODE("no_ecc"),
+        .FIFO_WRITE_DEPTH(FIFO_LENGTH),
+        .WRITE_DATA_WIDTH(C_S01_AXIS_TDATA_WIDTH),
+        .READ_DATA_WIDTH(C_M00_AXIS_TDATA_WIDTH),
+        .WR_DATA_COUNT_WIDTH(12),
+        .RD_DATA_COUNT_WIDTH(12),
+        .PROG_FULL_THRESH(FIFO_LENGTH-FIFO_BUFFER),
+        .PROG_EMPTY_THRESH(1)
+    ) fifo_1_inst (
+        .rst(fifo_1_reset),
+
+        // Write side
+        .wr_clk(s01_axis_aclk),
+        .wr_en(fifo_1_write_en),
+        .din(s01_axis_tdata),
+        // .full(fifo_1_full),
+        .prog_full(fifo_1_full),
+        .wr_data_count(fifo_1_wr_count),
+        .wr_rst_busy(fifo_1_wr_rst_busy),
+
+        // Read side
+        .rd_clk(m00_axis_aclk),
+        .rd_en(fifo_1_read_en),
+        .dout(fifo_1_out_data),
+        .empty(fifo_1_empty),
+        .rd_data_count(fifo_1_rd_count),
+        .rd_rst_busy(fifo_1_rd_rst_busy)
+    );
 
     //////////////////////////////////////////////////////////////////////////
     // Generate UDP Stream
@@ -262,7 +368,6 @@ module adc_to_udp_stream_v1_0 #
 
     // Initialize state
     initial begin
-        update_packet = 1'b0;
         user_reset = 8'b0;
     end
 
@@ -290,9 +395,6 @@ module adc_to_udp_stream_v1_0 #
         end
     end
 
-    integer next_packet_idx;
-    integer next_payload_idx;
-    integer pbi;
     // Assign Ethernet frame, IP header, UDP header, and payload to output
     always @(posedge m00_axis_aclk) begin
         // Reassign static packet on reset or update
@@ -357,39 +459,8 @@ module adc_to_udp_stream_v1_0 #
             udp_packet[4][63:0] <= {udp_packet_int[39], udp_packet_int[38], udp_packet_int[37], udp_packet_int[36], udp_packet_int[35], udp_packet_int[34], udp_packet_int[33], udp_packet_int[32]};
 
             // Assign payload from input stream buffer
-            // select buffer based on buffer_select (inverted to select in-active)
-            udp_packet[5][63:0] <= {input_buffer[!buffer_select][2], 
-                                    input_buffer[!buffer_select][1], 
-                                    input_buffer[!buffer_select][0], 
-                                    udp_packet_int[41], udp_packet_int[40]};
-
-            next_packet_idx = 6;    // Next 64-bit AXIS transaction index
-            next_payload_idx = 3;   // Next payload word index
-            for (i = 0; i < ((PAYLOAD_WORDS - 3)/4); i = i + 1) begin
-                pbi = 4*i + next_payload_idx;
-                udp_packet[next_packet_idx + i][63:0] <= {input_buffer[!buffer_select][pbi+3], 
-                                                          input_buffer[!buffer_select][pbi+2], 
-                                                          input_buffer[!buffer_select][pbi+1], 
-                                                          input_buffer[!buffer_select][pbi]};
-            end
-
-            pbi = pbi + 4; // Increment payload word index
-            next_packet_idx = next_packet_idx + i; // Increment packet index
-
-            // Initialize final packet to FF, will be ignored due to tkeep. 
-            udp_packet[next_packet_idx][63:0] <= 64'hFFFFFFFFFFFFFFFF;
-
-            // Overwrite with final bytes of payload
-            for (i = 0; i < LAST_PAYLOAD_WORDS; i = i + 1) begin
-                case (i)
-                    0: udp_packet[next_packet_idx][15:0] <= input_buffer[!buffer_select][pbi];
-                    1: udp_packet[next_packet_idx][31:16] <= input_buffer[!buffer_select][pbi+1];
-                    2: udp_packet[next_packet_idx][47:32] <= input_buffer[!buffer_select][pbi+2];
-                    3: udp_packet[next_packet_idx][63:48] <= input_buffer[!buffer_select][pbi+3];
-                    default: begin
-                    end
-                endcase
-            end
+            // Align ADC data with next full AXIS transacation
+            udp_packet[5][63:0] <= {48'hA55AA55AA55A, udp_packet_int[41], udp_packet_int[40]};
         end
     end
 
@@ -397,55 +468,113 @@ module adc_to_udp_stream_v1_0 #
     // AXI4 Stream Data Bus
     //////////////////////////////////////////////////////////////////////////
     // Send UDP Packet over AXI bus
+    assign start_payload = (packet_state >= (HEADER_STATE-FIFO_READ_DELAY)) && (packet_state <= FINAL_STATE);
+    assign in_payload = (packet_state >= HEADER_STATE) && (packet_state <= FINAL_STATE);
+
+    wire in_payload;
+    reg udp_packet_axis_valid;
+    reg udp_packet_axis_last;
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn) begin
             sent_counter <= 32'd0;
             packet_state <= 16'd0;
-            packet_index <= 16'd0;
-            tkeep_status <= 8'h00;
+            fifo_0_read_en_latched <= 0;
+            fifo_1_read_en_latched <= 0;
+            start_udp_header <= 0;
+            in_udp_header <= 0;
+            udp_packet_axis_last <= 0;
         end else begin
             // State machine to send the UDP packet over AXI4 Stream
             // start when input stream buffer is full
-            if (buffer_filled) begin
+            if (update_packet) begin
                 // Reset state to start a new packet transmission
-                buffer_filled <= 1'b0;                  // Clear the trigger after starting
                 packet_state <= 16'd0;
-                packet_index <= 16'd0;
-                tkeep_status <= 8'hFF;
-                update_packet = 1'b1;                   // Flag packet update
-            end else if (m00_axis_tvalid && m00_axis_tready) begin
-                // State machine to stream the UDP packet in 64-bit chunks
-                if (packet_state == 16'd0) begin
-                    sent_counter <= sent_counter + 1;   // Increment packets sent counter
-                    update_packet = 1'b0;               // Reset update packet request
-                end
-                // Increment packet index
-                if (packet_state < FINAL_STATE) begin
-                    packet_index <= packet_index + 1;
-                end
-                // Prior to final AXIS transacation, set tkeep
-                if( packet_state == (FINAL_STATE-1)) begin
-                    tkeep_status <= LAST_TKEEP[7:0];  
-                end
-                // Reset tkeep
-                if( packet_state >= FINAL_STATE) begin
-                    tkeep_status <= 8'h00;
+                start_udp_header <= 1'b1;
+                sent_counter <= sent_counter + 1;       // Increment packets sent counter
+            end else if (m00_axis_tready) begin
+                if (start_udp_header) begin
+                    // Wait one cycle for packet to update
+                    in_udp_header <= 1'b1;
                 end
 
+                if (start_udp_header || in_udp_header) begin
+                    // Assign tdata
+                    udp_packet_axis_data <= udp_packet[packet_state];
+
+                    // Switch from header to payload
+                    if( packet_state >= (HEADER_STATE - 1)) begin
+                        start_udp_header <= 1'b0;
+                        in_udp_header <= 1'b0;
+                    end
+                end 
+
                 // Increment packet state
-                if ( packet_state <= FINAL_STATE) begin
-                    packet_state <= packet_state + 1;
+                if (in_udp_header || in_payload) begin
+                    if (packet_state <= FINAL_STATE + 1) begin
+                        packet_state <= packet_state + 1;
+                    end
                 end
+            end
+
+            // update latched read enables
+            if(start_payload) begin 
+                // Buffer select = 0, read from Buffer 1 
+                if (fifo_1_full_reg) begin
+                    fifo_1_read_en_latched <= 1;
+                end
+
+                // Buffer select = 1, read from Buffer 0 
+                if (fifo_0_full_reg) begin
+                    fifo_0_read_en_latched <= 1;
+                end
+            end
+
+            // Reset read enables when fifo is empty
+            // of buffer is active for write
+            if (fifo_0_empty || !buffer_select) begin
+                fifo_0_read_en_latched <= 0;
+            end
+
+            if (fifo_1_empty || buffer_select) begin
+                fifo_1_read_en_latched <= 0;
+            end
+        end
+
+    end
+
+    // Assign the latched values to the read enables
+    // disable when tready is low
+    assign fifo_0_read_en = fifo_0_read_en_latched && start_payload && m00_axis_tready && !fifo_0_rst_busy;
+    assign fifo_1_read_en = fifo_1_read_en_latched && start_payload && m00_axis_tready && !fifo_1_rst_busy;
+
+    always @(posedge m00_axis_aclk) begin
+        if (~m00_axis_aresetn) begin
+            udp_packet_axis_data <= 16'b0; // default to 0
+            udp_packet_axis_valid <= 1'b0;
+        end else begin
+            // If read enable is active, assign AXIS buffer to FIFO output
+            if(in_udp_header) begin
+                udp_packet_axis_valid <= 1'b1;
+                udp_packet_axis_data <= udp_packet[packet_state];
+            end else if(fifo_0_read_en) begin
+                udp_packet_axis_valid <= 1'b1;
+                udp_packet_axis_data <= fifo_0_out_data;
+            end else if(fifo_1_read_en) begin
+                udp_packet_axis_valid <= 1'b1;
+                udp_packet_axis_data <= fifo_1_out_data;
+            end else begin
+                udp_packet_axis_valid <= 1'b0;
+                udp_packet_axis_data <= 16'b0; // default to 0
             end
         end
     end
 
     // AXI4-Stream control signals
-    assign m00_axis_tkeep = tkeep_status;
-    assign m00_axis_tvalid = (packet_state <= FINAL_STATE);   // Valid when we're in the middle of sending the packet
-    assign m00_axis_tdata = udp_packet[packet_index];           // Transmit each 64-bit word of the UDP packet
+    assign m00_axis_tkeep = 8'hFF;
+    assign m00_axis_tvalid = udp_packet_axis_valid;     // Valid when we're in the middle of sending the packet
+    assign m00_axis_tdata = udp_packet_axis_data;               // Transmit each 64-bit word of the UDP packet
     assign m00_axis_tuser = 8'b0;
-    assign m00_axis_tlast = (packet_state == FINAL_STATE) && m00_axis_tvalid; // Mark the last word of the packet
+    assign m00_axis_tlast = (packet_state == FINAL_STATE + 1) && m00_axis_tvalid; // Mark the last word of the packet
 
     //////////////////////////////////////////////////////////////////////////
     // AXI4-Lite Control Bus
