@@ -67,14 +67,15 @@ module adc_to_udp_stream_v1_0 #
 
     // Local params
     // localparam integer PAYLOAD_WORDS = 4128;                            // Payload length (in 16-bit words)
-    localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
+    // localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
+    localparam integer PAYLOAD_WORDS = 4100;                            // Payload length (in 16-bit words)
     localparam integer FIFO_LENGTH = 2048; //2048; //PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
-    localparam integer FIFO_BUFFER = 1024;
-    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2) + 8; // 8 bytes (UDP header) + 2 bytes/word * payload_length + counter
+    localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
+    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2); // 8 bytes (UDP header) + 2 bytes/word * payload_length
     localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;      // 20 bytes (IP header) + UDP length
     localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;     // 14 bytes (Ethernet header) + IP length
 
-    localparam integer HEADER_STATE = 7;                                  // States to tx (words + headers)
+    localparam integer HEADER_STATE = 6;                                  // States to tx (words + headers)
     localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;  // States to tx (words + headers)
 
     localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;          // 16-bit words
@@ -467,10 +468,7 @@ module adc_to_udp_stream_v1_0 #
             // Assign payload from input stream buffer
             // Align ADC data with next full AXIS transacation
             // Sequence # + size
-            udp_packet[5][63:0] <= {sent_counter[47:0], udp_packet_int[41], udp_packet_int[40]};
-
-            // Send final data from prior packet
-            udp_packet[6][63:0] <= {udp_packet_axis_data[63:16], sent_counter[63:48]};
+            udp_packet[5][63:0] <= {udp_packet_axis_data[63:16], udp_packet_int[41], udp_packet_int[40]};
         end
     end
 
