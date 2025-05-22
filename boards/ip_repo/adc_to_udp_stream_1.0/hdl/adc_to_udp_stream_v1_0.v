@@ -67,8 +67,7 @@ module adc_to_udp_stream_v1_0 #
 
     // Local params
     // localparam integer PAYLOAD_WORDS = 4128;                            // Payload length (in 16-bit words)
-    // localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
-    localparam integer PAYLOAD_WORDS = 4100;                            // Payload length (in 16-bit words)
+    localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
     localparam integer FIFO_LENGTH = 2048; //2048; //PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
     localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
     localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2); // 8 bytes (UDP header) + 2 bytes/word * payload_length
