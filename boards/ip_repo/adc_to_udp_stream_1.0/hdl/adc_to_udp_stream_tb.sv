@@ -103,22 +103,22 @@ module adc_to_udp_stream_v1_0_tb;
         .m00_axis_tready(m00_axis_tready)
     );
 
-    // Clock generation for AXI4-Lite (S00_AXI) (100 MHz = 10 ns period)
+    // Clock generation for AXI4-Lite (S00_AXI) (156.25MHz)
     initial begin
         s00_axi_aclk = 0;
-        forever #5 s00_axi_aclk = ~s00_axi_aclk;  // Toggle every 5 ns for a 10 ns period
+        forever #3.2ns s00_axi_aclk = ~s00_axi_aclk;  // Toggle  every .32ns
     end
 
-    // Clock generation for AXI4-Stream (S01_AXIS) (10 MHz = 100 ns period)
+    // Clock generation for AXI4-Stream (S01_AXIS) (38.4MHz)
     initial begin
         s01_axis_aclk = 0;
-        forever #50 s01_axis_aclk = ~s01_axis_aclk;  // Toggle every 50 ns for a 100 ns period
+        forever #13.02ns s01_axis_aclk = ~s01_axis_aclk;  // Toggle 
     end
 
-    // Clock generation for AXI4-Stream (M00_AXIS) (100 MHz = 10 ns period)
+    // Clock generation for AXI4-Stream (M00_AXIS) (156.25 MHz)
     initial begin
         m00_axis_aclk = 0;
-        forever #5 m00_axis_aclk = ~m00_axis_aclk;  // Toggle every 5 ns for a 10 ns period
+        forever #3.2ns m00_axis_aclk = ~m00_axis_aclk;  // Toggle 
     end
 
     // Reset generation
@@ -133,17 +133,24 @@ module adc_to_udp_stream_v1_0_tb;
 
     // Test logic
     integer i;
+    longint input_stream_data;
     bit tvalid_high = 0;
-    integer input_stream_data;
+    
+    initial begin
+        // Initialize tready to high
+        m00_axis_tready = 1'b1;
+
+        // Disable and reenable tready
+        #55us m00_axis_tready = 1'b0;
+        #5us m00_axis_tready = 1'b1;
+    end
 
     initial begin
         // Initialize incoming AXIS signals
         s01_axis_tvalid = 0;
         s01_axis_tdata = 0;
 
-        // Initialize tready to high
-        m00_axis_tready = 1'b1;
-        input_stream_data = 0;
+        input_stream_data = 64'h007CB66BA55A0000;
 
         // Wait for reset deassertion
         @(posedge m00_axis_aresetn);

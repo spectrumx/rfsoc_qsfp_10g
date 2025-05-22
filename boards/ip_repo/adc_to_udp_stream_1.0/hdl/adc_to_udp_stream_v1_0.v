@@ -60,20 +60,21 @@ module adc_to_udp_stream_v1_0 #
     output wire m00_axis_tvalid,
     output wire [C_M00_AXIS_TDATA_WIDTH-1 : 0] m00_axis_tdata,
     output wire [C_M00_AXIS_TKEEP_WIDTH-1 : 0] m00_axis_tkeep,
-    output wire [7 : 0] m00_axis_tuser,
+    output wire m00_axis_tuser,
     output wire m00_axis_tlast,
     input wire m00_axis_tready
 );
 
     // Local params
-    localparam integer PAYLOAD_WORDS = 4128;                            // Payload length (in 16-bit words)
-    localparam integer FIFO_BUFFER = 8;
-    localparam integer FIFO_LENGTH = PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
-    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2);     // 8 bytes (UDP header) + 2 bytes/word * payload_length
+    // localparam integer PAYLOAD_WORDS = 4128;                            // Payload length (in 16-bit words)
+    localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
+    localparam integer FIFO_LENGTH = 2048; //2048; //PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
+    localparam integer FIFO_BUFFER = 1024;
+    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2) + 8; // 8 bytes (UDP header) + 2 bytes/word * payload_length + counter
     localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;      // 20 bytes (IP header) + UDP length
     localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;     // 14 bytes (Ethernet header) + IP length
 
-    localparam integer HEADER_STATE = 6;                                  // States to tx (words + headers)
+    localparam integer HEADER_STATE = 7;                                  // States to tx (words + headers)
     localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;  // States to tx (words + headers)
 
     localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;          // 16-bit words
@@ -117,10 +118,12 @@ module adc_to_udp_stream_v1_0 #
 
     // AXI bus signals
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet_axis_data;           
+    reg [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_out_data_prev;           
 
     // Timer to trigger packet transmission every 100ms
-    reg [31:0] sent_counter;                    // 32-bit counter for sent packets
+    reg [63:0] sent_counter;                    // 64-bit counter for sent packets
     reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
+    reg [31:0] full_buffer_counter;             // 32-bit counter for full buffers
     reg [7:0] user_reset;                       // State of user reset
 
     // FIFO
@@ -206,15 +209,18 @@ module adc_to_udp_stream_v1_0 #
             fifo_0_full_delay <= 1'b0;
             fifo_1_full_reg <= 1'b0;
             fifo_1_full_delay <= 1'b0;
+            full_buffer_counter <= 1'b0;
         end else begin
             if(fifo_0_full) begin
                 fifo_0_full_reg <= 1'b1;
+                full_buffer_counter <= full_buffer_counter + 1;
                 if (!fifo_1_full) begin
                     fifo_1_full_reg <= 1'b0;
                 end
             end
             if(fifo_1_full) begin
                 fifo_1_full_reg <= 1'b1;
+                full_buffer_counter <= full_buffer_counter + 1;
                 if (!fifo_0_full) begin
                     fifo_0_full_reg <= 1'b0;
                 end
@@ -247,7 +253,7 @@ module adc_to_udp_stream_v1_0 #
         .WR_DATA_COUNT_WIDTH(12),
         .RD_DATA_COUNT_WIDTH(12),
         .PROG_FULL_THRESH(FIFO_LENGTH-FIFO_BUFFER),
-        .PROG_EMPTY_THRESH(1)
+        .PROG_EMPTY_THRESH(3)
     ) fifo_0_inst (
         .rst(fifo_0_reset),
 
@@ -278,7 +284,7 @@ module adc_to_udp_stream_v1_0 #
         .WR_DATA_COUNT_WIDTH(12),
         .RD_DATA_COUNT_WIDTH(12),
         .PROG_FULL_THRESH(FIFO_LENGTH-FIFO_BUFFER),
-        .PROG_EMPTY_THRESH(1)
+        .PROG_EMPTY_THRESH(3)
     ) fifo_1_inst (
         .rst(fifo_1_reset),
 
@@ -460,7 +466,11 @@ module adc_to_udp_stream_v1_0 #
 
             // Assign payload from input stream buffer
             // Align ADC data with next full AXIS transacation
-            udp_packet[5][63:0] <= {48'hA55AA55AA55A, udp_packet_int[41], udp_packet_int[40]};
+            // Sequence # + size
+            udp_packet[5][63:0] <= {sent_counter[47:0], udp_packet_int[41], udp_packet_int[40]};
+
+            // Send final data from prior packet
+            udp_packet[6][63:0] <= {udp_packet_axis_data[63:16], sent_counter[63:48]};
         end
     end
 
@@ -473,16 +483,14 @@ module adc_to_udp_stream_v1_0 #
 
     wire in_payload;
     reg udp_packet_axis_valid;
-    reg udp_packet_axis_last;
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn) begin
-            sent_counter <= 32'd0;
+            sent_counter <= 64'd0;
             packet_state <= 16'd0;
             fifo_0_read_en_latched <= 0;
             fifo_1_read_en_latched <= 0;
             start_udp_header <= 0;
             in_udp_header <= 0;
-            udp_packet_axis_last <= 0;
         end else begin
             // State machine to send the UDP packet over AXI4 Stream
             // start when input stream buffer is full
@@ -498,9 +506,6 @@ module adc_to_udp_stream_v1_0 #
                 end
 
                 if (start_udp_header || in_udp_header) begin
-                    // Assign tdata
-                    udp_packet_axis_data <= udp_packet[packet_state];
-
                     // Switch from header to payload
                     if( packet_state >= (HEADER_STATE - 1)) begin
                         start_udp_header <= 1'b0;
@@ -550,31 +555,40 @@ module adc_to_udp_stream_v1_0 #
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn) begin
             udp_packet_axis_data <= 16'b0; // default to 0
+            fifo_out_data_prev <= 16'b0; // default to 0
             udp_packet_axis_valid <= 1'b0;
         end else begin
+            // First transaction 
+            if (start_udp_header && !in_udp_header) begin
+                // Assign tdata
+                udp_packet_axis_data <= udp_packet[packet_state];
+            end else if(in_udp_header) begin
             // If read enable is active, assign AXIS buffer to FIFO output
-            if(in_udp_header) begin
                 udp_packet_axis_valid <= 1'b1;
                 udp_packet_axis_data <= udp_packet[packet_state];
             end else if(fifo_0_read_en) begin
                 udp_packet_axis_valid <= 1'b1;
-                udp_packet_axis_data <= fifo_0_out_data;
+                fifo_out_data_prev <= fifo_0_out_data;
+                udp_packet_axis_data <= {fifo_0_out_data[47:0], fifo_out_data_prev[63:48]};
             end else if(fifo_1_read_en) begin
                 udp_packet_axis_valid <= 1'b1;
-                udp_packet_axis_data <= fifo_1_out_data;
+                fifo_out_data_prev <= fifo_1_out_data;
+                udp_packet_axis_data <= {fifo_1_out_data[47:0], fifo_out_data_prev[63:48]};
             end else begin
                 udp_packet_axis_valid <= 1'b0;
-                udp_packet_axis_data <= 16'b0; // default to 0
             end
         end
     end
 
     // AXI4-Stream control signals
-    assign m00_axis_tkeep = 8'hFF;
     assign m00_axis_tvalid = udp_packet_axis_valid;     // Valid when we're in the middle of sending the packet
-    assign m00_axis_tdata = udp_packet_axis_data;               // Transmit each 64-bit word of the UDP packet
-    assign m00_axis_tuser = 8'b0;
+    assign m00_axis_tdata = m00_axis_tvalid ? udp_packet_axis_data : 64'd0;               // Transmit each 64-bit word of the UDP packet
+    assign m00_axis_tuser = 1'b0;
     assign m00_axis_tlast = (packet_state == FINAL_STATE + 1) && m00_axis_tvalid; // Mark the last word of the packet
+    assign m00_axis_tkeep = m00_axis_tlast ? 8'h3 : 8'hFF;
+
+
+    assign s01_axis_tready = 1'b1;
 
     //////////////////////////////////////////////////////////////////////////
     // AXI4-Lite Control Bus
@@ -658,7 +672,7 @@ module adc_to_udp_stream_v1_0 #
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
                 32'h0000_0000: s00_axi_rdata = user_reset; 
-                32'h0000_0004: s00_axi_rdata = sent_counter;       
+                32'h0000_0004: s00_axi_rdata = sent_counter[31:0];       
                 32'h0000_0008: s00_axi_rdata = received_counter;           
                 32'h0000_000C: begin
                     s00_axi_rdata = {eth_dst_mac[2], eth_dst_mac[3], eth_dst_mac[4], eth_dst_mac[5]};
@@ -682,6 +696,8 @@ module adc_to_udp_stream_v1_0 #
                     // Destination Port
                     s00_axi_rdata = {8'b0, 8'b0, udp_header[2], udp_header[3]};
                 end
+                32'h0000_0024: s00_axi_rdata = full_buffer_counter;
+                32'h0000_0028: s00_axi_rdata = {16'b0, 5'b0, m00_axis_aresetn, m00_axis_tready, m00_axis_tvalid, 5'b0, s01_axis_aresetn, s01_axis_tready, s01_axis_tvalid};
                 default: s00_axi_rdata = 32'b0;
             endcase
         end
