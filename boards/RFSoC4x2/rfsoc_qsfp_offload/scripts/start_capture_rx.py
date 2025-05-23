@@ -24,8 +24,8 @@ def main(args):
     client_ip = '192.168.4.1'
 
     print("Initializing RFSoC 10G Overlay")
-    #ol = Overlay(ignore_version=True)
-    ol = Overlay(bitfile_name="/opt/git/rfsoc_qsfp_10g/boards/RFSoC4x2/rfsoc_qsfp_offload/bitstream/rfsoc_offload_10g_adc0.bit", ignore_version=True)
+    ol = Overlay(ignore_version=True)
+
     # Wait for overlay to initialize
     time.sleep(5) # Magic sleep
 
