@@ -86,7 +86,7 @@ def main(args):
     if 'A' in args.channels:
         ol.adc_to_udp_stream_A.register_map.USER_RESET = 0
     if 'B' in args.channels:
-    ol.adc_to_udp_stream_B.r>>egister_map.USER_RESET = 0
+        ol.adc_to_udp_stream_B.register_map.USER_RESET = 0
 
 if __name__ == "__main__":
     # CTRL-C handler
