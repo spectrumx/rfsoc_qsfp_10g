@@ -37,3 +37,7 @@ set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_lpmode_ls" ]
 
 set_property PACKAGE_PIN AK22 [ get_ports "qsfp_modsell_ls" ]
 set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_modsell_ls" ]
+
+## PPS
+set_property PACKAGE_PIN AJ13 [ get_ports "pps_comp_in" ]
+set_property IOSTANDARD LVCMOS18 [ get_ports "pps_comp_in" ]

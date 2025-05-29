@@ -33,7 +33,6 @@ def main(args):
 
     # Start ADC
     ADC_TILE = 2       # ADC Tile 226
-    ADC_BLOCK = 0       # ADC Block 0
     ADC_SAMPLE_FREQUENCY = 1024  # MSps
     ADC_PLL_FREQUENCY    = 491.52   # MHz
     ADC_FC = -1*f_c # FM Band
@@ -41,9 +40,9 @@ def main(args):
     pll_freq = ADC_PLL_FREQUENCY
     fs = ADC_SAMPLE_FREQUENCY
     tile = ADC_TILE
-    block=ADC_BLOCK
     fc = ADC_FC
 
+    block = 1       # ADC Block 1 (A)
     ol.rfdc.adc_tiles[tile].DynamicPLLConfig(1, pll_freq, fs)
     ol.rfdc.adc_tiles[tile].blocks[block].NyquistZone = 1
     ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = {
@@ -58,11 +57,36 @@ def main(args):
     ol.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
     ol.rfdc.adc_tiles[tile].SetupFIFO(True)
 
-    print("Starting UDP stream")
+    block = 0       # ADC Block 0 (B)
+    ol.rfdc.adc_tiles[tile].DynamicPLLConfig(1, pll_freq, fs)
+    ol.rfdc.adc_tiles[tile].blocks[block].NyquistZone = 1
+    ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = {
+                'CoarseMixFreq':  xrfdc.COARSE_MIX_BYPASS,
+                'EventSource':    xrfdc.EVNT_SRC_TILE,
+                'FineMixerScale': xrfdc.MIXER_SCALE_1P0,
+                'Freq':           fc,
+                'MixerMode':      xrfdc.MIXER_MODE_R2C,
+                'MixerType':      xrfdc.MIXER_TYPE_FINE,
+                'PhaseOffset':    0.0
+            }
+    ol.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
+    ol.rfdc.adc_tiles[tile].SetupFIFO(True)
+
+    print(f"Starting UDP stream on: {args.channels}")
+    ol.adc_to_udp_stream_A.register_map.USER_RESET = 0
+    ol.adc_to_udp_stream_B.register_map.USER_RESET = 0
+
     print("Ctrl-C to exit")
     while(not exit_flag):
         time.sleep(1)
         print(".", end='', flush=True)
+
+
+    print("Stopping UDP stream")
+    if 'A' in args.channels:
+        ol.adc_to_udp_stream_A.register_map.USER_RESET = 0
+    if 'B' in args.channels:
+    ol.adc_to_udp_stream_B.r>>egister_map.USER_RESET = 0
 
 if __name__ == "__main__":
     # CTRL-C handler
@@ -76,6 +100,9 @@ if __name__ == "__main__":
         )
     parser.add_argument('-f', '--freq',type=float,help='Center frequency (MHz)',
                         default = '1000')
+    parser.add_argument('-c', '--channels',type=str,nargs='+',
+                        choices=['A', 'B', 'C', 'D'], help='List of channels (A, B)',
+                        default = 'A')
                         
     args = parser.parse_args()
     main(args)

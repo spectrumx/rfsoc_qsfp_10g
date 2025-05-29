@@ -1,10 +1,17 @@
+///////////////////////////////////////////////////////////////////////////////
+// adc_to_udp_stream_tb.v
+//
+//  Testbench for adc_to_udp_stream
+//
+///////////////////////////////////////////////////////////////////////////////
+
 `timescale 1 ns / 1 ps
 
 module adc_to_udp_stream_v1_0_tb;
 
     // Control AXI bus
     parameter integer C_S00_AXI_DATA_WIDTH	= 32;
-    parameter integer C_S00_AXI_ADDR_WIDTH	= 5;
+    parameter integer C_S00_AXI_ADDR_WIDTH	= 6;
 
     // Incoming AXIS bus
     parameter integer C_S01_AXIS_TDATA_WIDTH = 64;
@@ -12,6 +19,9 @@ module adc_to_udp_stream_v1_0_tb;
     // Outgoing AXIS bus
     parameter integer C_M00_AXIS_TDATA_WIDTH = 64;
     parameter integer C_M00_AXIS_TKEEP_WIDTH = 8;
+
+    // Default UDP Port
+    parameter integer UDP_PORT = 60133;
 
     // Clock and Reset signals for AXI4-Lite (S00_AXI)
     reg s00_axi_aclk;
@@ -26,17 +36,17 @@ module adc_to_udp_stream_v1_0_tb;
     reg m00_axis_aresetn;
 
     // Signals for AXI4-Lite (S00_AXI)
-    wire [C_S00_AXI_ADDR_WIDTH-1 : 0] s00_axi_awaddr;
-    wire [2 : 0] s00_axi_awprot;
-    wire s00_axi_awvalid;
-    reg s00_axi_awready;
-    wire [C_S00_AXI_DATA_WIDTH-1 : 0] s00_axi_wdata;
-    wire [(C_S00_AXI_DATA_WIDTH/8)-1 : 0] s00_axi_wstrb;
-    wire s00_axi_wvalid;
+    reg [C_S00_AXI_ADDR_WIDTH-1 : 0] s00_axi_awaddr;
+    reg [2 : 0] s00_axi_awprot;
+    reg s00_axi_awvalid;
+    wire s00_axi_awready;
+    reg [C_S00_AXI_DATA_WIDTH-1 : 0] s00_axi_wdata;
+    reg [(C_S00_AXI_DATA_WIDTH/8)-1 : 0] s00_axi_wstrb;
+    reg s00_axi_wvalid;
     reg s00_axi_wready;
     reg [1 : 0] s00_axi_bresp;
-    reg s00_axi_bvalid;
-    wire s00_axi_bready;
+    wire s00_axi_bvalid;
+    reg s00_axi_bready;
     wire [C_S00_AXI_ADDR_WIDTH-1 : 0] s00_axi_araddr;
     wire [2 : 0] s00_axi_arprot;
     wire s00_axi_arvalid;
@@ -59,11 +69,14 @@ module adc_to_udp_stream_v1_0_tb;
     wire m00_axis_tuser;
     reg m00_axis_tready;
 
-    // Instantiate the UDP Stream module
+    // Instantiate the ADC to UDP Stream module
     adc_to_udp_stream_v1_0 #(
-        .C_S00_AXI_DATA_WIDTH(32),
-        .C_S00_AXI_ADDR_WIDTH(5),
-        .C_M00_AXIS_TDATA_WIDTH(64)
+        .C_S00_AXI_DATA_WIDTH(C_S00_AXI_DATA_WIDTH),
+        .C_S00_AXI_ADDR_WIDTH(C_S00_AXI_ADDR_WIDTH),
+        .C_S01_AXIS_TDATA_WIDTH(C_S01_AXIS_TDATA_WIDTH),
+        .C_M00_AXIS_TDATA_WIDTH(C_M00_AXIS_TDATA_WIDTH),
+        .C_M00_AXIS_TKEEP_WIDTH(C_M00_AXIS_TKEEP_WIDTH),
+        .UDP_PORT(UDP_PORT)
     ) dut (
         .s00_axi_aclk(s00_axi_aclk),
         .s00_axi_aresetn(s00_axi_aresetn),
@@ -135,7 +148,88 @@ module adc_to_udp_stream_v1_0_tb;
     integer i;
     longint input_stream_data;
     bit tvalid_high = 0;
-    
+
+    // Write to reg 0 to disable user reset 
+    initial begin
+        // Initialize S00 signals
+        s00_axi_awaddr = 32'h0;
+        s00_axi_awprot = 3'h0;
+        s00_axi_wstrb = 4'h0;
+        s00_axi_bready = 1'b0;
+
+        s00_axi_wdata = 32'h00;
+        s00_axi_awvalid = 1'b0;
+        s00_axi_wvalid = 1'b0;
+
+        // Write 8'h1 to address 0 on s00 AXI bus at 20us
+        #55us; 
+        s00_axi_awaddr = 32'h0; // Address 0
+        s00_axi_awprot = 3'h0;  // Write address not protected
+        s00_axi_awvalid = 1'b1; // Write address valid
+
+        // Wait for AWREADY and clock edge
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready) @(posedge s00_axi_aclk); // Wait until ready
+
+        s00_axi_wdata = 32'h0;  // Set reset low
+        s00_axi_wstrb = 4'hF;   // Write all 4 bytes
+        s00_axi_wvalid = 1'b1;  // Write valid
+
+        // Wait for WREADY
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready) @(posedge s00_axi_aclk); // Wait until ready
+        s00_axi_wvalid = 1'b0;
+        s00_axi_awvalid = 1'b0;
+
+        // Wait for BVALID and respond
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_bvalid) @(posedge s00_axi_aclk);
+        s00_axi_bready = 1'b1;
+        @(posedge s00_axi_aclk);
+        s00_axi_bready = 1'b0;
+    end
+
+    // Write to reg 1 to enable user reset 
+    initial begin
+        // Initialize S00 signals
+        s00_axi_awaddr = 32'h0;
+        s00_axi_awprot = 3'h0;
+        s00_axi_wstrb = 4'h0;
+        s00_axi_bready = 1'b0;
+
+        s00_axi_wdata = 32'h00;
+        s00_axi_awvalid = 1'b0;
+        s00_axi_wvalid = 1'b0;
+
+        // Write 8'h0 to address 0 on s00 AXI bus at 20us
+        #190us; 
+        s00_axi_awaddr = 32'h0; // Address 0
+        s00_axi_awprot = 3'h0;  // Write address not protected
+        s00_axi_awvalid = 1'b1; // Write address valid
+
+        // Wait for AWREADY and clock edge
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready) @(posedge s00_axi_aclk); // Wait until ready
+
+        s00_axi_wdata = 32'h1;  // Set reset high
+        s00_axi_wstrb = 4'hF;   // Write all 4 bytes
+        s00_axi_wvalid = 1'b1;  // Write valid
+
+        // Wait for WREADY
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_awready) @(posedge s00_axi_aclk); // Wait until ready
+        s00_axi_wvalid = 1'b0;
+        s00_axi_awvalid = 1'b0;
+
+        // Wait for BVALID and respond
+        @(posedge s00_axi_aclk);
+        while (!s00_axi_bvalid) @(posedge s00_axi_aclk);
+        s00_axi_bready = 1'b1;
+        @(posedge s00_axi_aclk);
+        s00_axi_bready = 1'b0;
+    end
+
+    // Disable m00 tready to check that output data stream pauses
     initial begin
         // Initialize tready to high
         m00_axis_tready = 1'b1;
@@ -145,6 +239,7 @@ module adc_to_udp_stream_v1_0_tb;
         #5us m00_axis_tready = 1'b1;
     end
 
+    // Send incrementing data to input stream
     initial begin
         // Initialize incoming AXIS signals
         s01_axis_tvalid = 0;

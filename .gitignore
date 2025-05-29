@@ -8,3 +8,4 @@ boards/RFSoC4x2/rfsoc_offload/rfsoc_offload/
 *.jou
 NA/
 .Xil/
+*.swp
