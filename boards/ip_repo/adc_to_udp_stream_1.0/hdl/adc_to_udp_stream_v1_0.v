@@ -21,7 +21,10 @@ module adc_to_udp_stream_v1_0 #
 
     // Parameters of Output AXIS Master Bus Interface M00_AXIS
     parameter integer C_M00_AXIS_TDATA_WIDTH = 64,
-    parameter integer C_M00_AXIS_TKEEP_WIDTH = 8
+    parameter integer C_M00_AXIS_TKEEP_WIDTH = 8,
+
+    // Default port
+    parameter integer UDP_PORT = 60133
 )
 (
     // Ports of Axi Slave Bus Interface S00_AXI
@@ -66,7 +69,6 @@ module adc_to_udp_stream_v1_0 #
 );
 
     // Local params
-    // localparam integer PAYLOAD_WORDS = 4128;                            // Payload length (in 16-bit words)
     localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
     localparam integer FIFO_LENGTH = 2048; //2048; //PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
     localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
@@ -124,7 +126,7 @@ module adc_to_udp_stream_v1_0 #
     reg [63:0] sent_counter;                    // 64-bit counter for sent packets
     reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
     reg [31:0] full_buffer_counter;             // 32-bit counter for full buffers
-    reg [7:0] user_reset;                       // State of user reset
+    reg [31:0] user_reset;                       // State of user reset
 
     // FIFO
     wire fifo_0_full;
@@ -199,12 +201,12 @@ module adc_to_udp_stream_v1_0 #
     assign fifo_0_rst_busy = fifo_0_wr_rst_busy || fifo_0_rd_rst_busy;
     assign fifo_1_rst_busy = fifo_1_wr_rst_busy || fifo_1_rd_rst_busy;
     assign buffer_select = fifo_0_full | fifo_0_full_reg;
-    assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && !fifo_0_rst_combined && !buffer_select;
-    assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && !fifo_1_rst_combined && buffer_select;
+    assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_0_rst_combined && !buffer_select;
+    assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_1_rst_combined && buffer_select;
 
     // Flag fifo full transition for a single cycle
     always @(posedge m00_axis_aclk) begin
-        if (!m00_axis_aresetn) begin
+        if (!m00_axis_aresetn || user_reset) begin
             fifo_0_full_reg <= 1'b0;
             fifo_0_full_delay <= 1'b0;
             fifo_1_full_reg <= 1'b0;
@@ -354,10 +356,10 @@ module adc_to_udp_stream_v1_0 #
         ip_header[19][7:0] = 8'h01;  
 
         // UDP Header
-        udp_header[0][7:0] = 8'hEA;   // Source port 60133
-        udp_header[1][7:0] = 8'hE5;
-        udp_header[2][7:0] = 8'hEA;   // Dest port 60133
-        udp_header[3][7:0] = 8'hE5;
+        udp_header[0][7:0] = UDP_PORT[15:8];
+        udp_header[1][7:0] = UDP_PORT[7:0];
+        udp_header[2][7:0] = UDP_PORT[15:8];
+        udp_header[3][7:0] = UDP_PORT[7:0];
         udp_header[4][7:0] = UDP_HEADER_LENGTH[15:8];  // UDP Length MSB
         udp_header[5][7:0] = UDP_HEADER_LENGTH[7:0];   // UDP Length LSB
         udp_header[6][7:0] = 8'h00;   // Checksum placeholder 
@@ -374,13 +376,13 @@ module adc_to_udp_stream_v1_0 #
 
     // Initialize state
     initial begin
-        user_reset = 8'b0;
+        user_reset = 32'h1;
     end
 
     // Calculate IP Checksum
     always @(posedge m00_axis_aclk) begin
         // Reassign static packet on reset
-        if ((m00_axis_aresetn == 1'b0) || (update_packet == 1'b1)) begin
+        if (!m00_axis_aresetn || user_reset || (update_packet == 1'b1)) begin
             sum = 32'b0;
             ip_header[10] = 8'h0;
             ip_header[11] = 8'h0;
@@ -405,7 +407,7 @@ module adc_to_udp_stream_v1_0 #
     always @(posedge m00_axis_aclk) begin
         // Reassign static packet on reset or update
         // Update is triggered when sending a new packet
-        if ((m00_axis_aresetn == 1'b0) || (update_packet == 1'b1)) begin
+        if (!m00_axis_aresetn || user_reset || (update_packet == 1'b1)) begin
             // Ethernet Header
             udp_packet_int[0] <= eth_dst_mac[0];
             udp_packet_int[1] <= eth_dst_mac[1];
@@ -481,7 +483,7 @@ module adc_to_udp_stream_v1_0 #
     wire in_payload;
     reg udp_packet_axis_valid;
     always @(posedge m00_axis_aclk) begin
-        if (~m00_axis_aresetn) begin
+        if (~m00_axis_aresetn || user_reset) begin
             sent_counter <= 64'd0;
             packet_state <= 16'd0;
             fifo_0_read_en_latched <= 0;
@@ -550,7 +552,7 @@ module adc_to_udp_stream_v1_0 #
     assign fifo_1_read_en = fifo_1_read_en_latched && start_payload && m00_axis_tready && !fifo_1_rst_busy;
 
     always @(posedge m00_axis_aclk) begin
-        if (~m00_axis_aresetn) begin
+        if (~m00_axis_aresetn || user_reset) begin
             udp_packet_axis_data <= 16'b0; // default to 0
             fifo_out_data_prev <= 16'b0; // default to 0
             udp_packet_axis_valid <= 1'b0;
@@ -578,8 +580,8 @@ module adc_to_udp_stream_v1_0 #
     end
 
     // AXI4-Stream control signals
-    assign m00_axis_tvalid = udp_packet_axis_valid;     // Valid when we're in the middle of sending the packet
-    assign m00_axis_tdata = m00_axis_tvalid ? udp_packet_axis_data : 64'd0;               // Transmit each 64-bit word of the UDP packet
+    assign m00_axis_tvalid = udp_packet_axis_valid && (user_reset == 32'h0);     // Valid when we're in the middle of sending the packet
+    assign m00_axis_tdata = m00_axis_tvalid ? udp_packet_axis_data : 64'h0;               // Transmit each 64-bit word of the UDP packet
     assign m00_axis_tuser = 1'b0;
     assign m00_axis_tlast = (packet_state == FINAL_STATE + 1) && m00_axis_tvalid; // Mark the last word of the packet
     assign m00_axis_tkeep = m00_axis_tlast ? 8'h3 : 8'hFF;
@@ -599,7 +601,7 @@ module adc_to_udp_stream_v1_0 #
     assign s00_axi_rresp = 2'b00;
 
     // Write Logic: when AXI4 Write transaction occurs, write the data to char_reg
-    always @(posedge s00_axi_aclk or negedge s00_axi_aresetn) begin
+    always @(posedge s00_axi_aclk) begin
         if (~s00_axi_aresetn) begin
             eth_dst_mac[0] = 8'hFF;
             eth_dst_mac[1] = 8'hFF;
@@ -613,7 +615,7 @@ module adc_to_udp_stream_v1_0 #
             eth_dst_mac_lsb[3] = 8'h00;
         end else if (s00_axi_awvalid && s00_axi_wvalid) begin
             case (s00_axi_awaddr)
-                32'h0000_0000: user_reset[7:0] <= s00_axi_wdata[7:0];
+                32'h0000_0000: user_reset[31:0] <= s00_axi_wdata[31:0];
                 32'h0000_000C: begin
                     // Dest MAC LSB
                     eth_dst_mac_lsb[3] <= s00_axi_wdata[7:0];
