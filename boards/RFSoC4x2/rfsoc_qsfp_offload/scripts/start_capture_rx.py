@@ -41,7 +41,7 @@ def main(args):
     tile = ADC_TILE
     fc = ADC_FC
 
-    mixer_settings = {
+    mixer_settings_block_0 = {
             'CoarseMixFreq':  xrfdc.COARSE_MIX_BYPASS,
             'EventSource':    xrfdc.EVNT_SRC_TILE,
             'FineMixerScale': xrfdc.MIXER_SCALE_1P0,
@@ -54,15 +54,14 @@ def main(args):
     block = 0       # ADC Block 0 (B)
     ol.rfdc.adc_tiles[tile].DynamicPLLConfig(1, pll_freq, fs)
     ol.rfdc.adc_tiles[tile].blocks[block].NyquistZone = 1
-    ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = mixer_settings
+    ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = mixer_settings_block_0
     ol.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
-    ol.rfdc.adc_tiles[tile].SetupFIFO(True)
 
-    block = 1       # ADC Block 1 (A)
-    ol.rfdc.adc_tiles[tile].DynamicPLLConfig(1, pll_freq, fs)
-    ol.rfdc.adc_tiles[tile].blocks[block].NyquistZone = 1
-    ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = mixer_settings
-    ol.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
+    mixer_settings_block_1 = mixer_settings_block_0.copy()
+
+    ol.rfdc.adc_tiles[tile].blocks[1].NyquistZone = 1
+    ol.rfdc.adc_tiles[tile].blocks[1].MixerSettings = mixer_settings_block_1
+    ol.rfdc.adc_tiles[tile].blocks[1].UpdateEvent(xrfdc.EVENT_MIXER)
     ol.rfdc.adc_tiles[tile].SetupFIFO(True)
 
     print(f"Starting UDP stream on: {args.channels}")
