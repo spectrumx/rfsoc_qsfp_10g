@@ -405,7 +405,7 @@
         </PORT>
         <PORT DIR="I" NAME="s01_axis_aresetn" POLARITY="ACTIVE_LOW" SIGIS="rst" SIGNAME="rst_307M2_peripheral_aresetn">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="ps8_0_axi_periph" PORT="M02_AXI_rresp"/>
+            <CONNECTION INSTANCE="rst_307M2" PORT="peripheral_aresetn"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="s01_axis_tvalid" SIGIS="undef" SIGNAME="adc_to_udp_stream_A_s01_axis_tvalid">
@@ -21292,7 +21292,7 @@
             <CONNECTION INSTANCE="reset_disable" PORT="dout"/>
           </CONNECTIONS>
         </PORT>
-        <PORT CLKFREQUENCY="100000000" DIR="O" NAME="rxrecclkout_0" SIGIS="clk"/>
+        <PORT CLKFREQUENCY="156250000" DIR="O" NAME="rxrecclkout_0" SIGIS="clk"/>
         <PORT DIR="I" NAME="sys_reset" POLARITY="ACTIVE_HIGH" SIGIS="rst" SIGNAME="rst_ps8_0_96M_peripheral_reset">
           <CONNECTIONS>
             <CONNECTION INSTANCE="rst_ps8_0_96M" PORT="peripheral_reset"/>
@@ -21680,7 +21680,7 @@
           <PARAMETER NAME="HAS_TKEEP" VALUE="1"/>
           <PARAMETER NAME="HAS_TLAST" VALUE="1"/>
           <PARAMETER NAME="FREQ_HZ" VALUE="156250000"/>
-          <PARAMETER NAME="PHASE" VALUE="0.0"/>
+          <PARAMETER NAME="PHASE" VALUE="0"/>
           <PARAMETER NAME="CLK_DOMAIN" VALUE="block_design_xxv_ethernet_0_0_rx_clk_out_0"/>
           <PARAMETER NAME="LAYERED_METADATA" VALUE="undef"/>
           <PARAMETER NAME="INSERT_VIP" VALUE="0"/>
@@ -21702,7 +21702,7 @@
           <PARAMETER NAME="HAS_TKEEP" VALUE="1"/>
           <PARAMETER NAME="HAS_TLAST" VALUE="1"/>
           <PARAMETER NAME="FREQ_HZ" VALUE="156250000"/>
-          <PARAMETER NAME="PHASE" VALUE="0.0"/>
+          <PARAMETER NAME="PHASE" VALUE="0"/>
           <PARAMETER NAME="CLK_DOMAIN" VALUE="block_design_xxv_ethernet_0_0_tx_clk_out_0"/>
           <PARAMETER NAME="LAYERED_METADATA" VALUE="undef"/>
           <PARAMETER NAME="INSERT_VIP" VALUE="0"/>
@@ -24096,7 +24096,6 @@
             <CONNECTION INSTANCE="rst_dac_153M6" PORT="ext_reset_in"/>
             <CONNECTION INSTANCE="rst_dac_333M" PORT="ext_reset_in"/>
             <CONNECTION INSTANCE="rst_ps8_0_96M" PORT="ext_reset_in"/>
-            <CONNECTION INSTANCE="eth_tx_clk_reset" PORT="ext_reset_in"/>
           </CONNECTIONS>
         </PORT>
         <PORT CLKFREQUENCY="96968727" DIR="O" NAME="pl_clk0" SIGIS="clk" SIGNAME="zynq_ultra_ps_e_0_pl_clk0">
