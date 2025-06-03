@@ -6,6 +6,23 @@
 //
 //  Assumes constant stream from 64-bit input
 //
+// Expected Packet header
+//   struct RfPktHeader {
+//     uint64_t sample_idx;
+//     uint64_t sample_rate_numerator;
+//     uint64_t sample_rate_denominator;
+//     uint32_t frequency_idx;
+//     uint32_t num_subchannels;
+//     uint32_t pkt_samples;
+//     uint16_t bits_per_int;
+//     unsigned is_complex : 1;
+//     unsigned reserved0 : 7;
+//     uint8_t reserved1;
+//     uint64_t reserved2;
+//     uint64_t reserved3;
+//     uint64_t reserved4;
+//   } __attribute__((__packed__)); 
+//
 ///////////////////////////////////////////////////////////////////////////////
 
 `timescale 1 ns / 1 ps
@@ -69,18 +86,19 @@ module adc_to_udp_stream_v1_0 #
 );
 
     // Local params
-    localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
-    localparam integer FIFO_LENGTH = 2048; //2048; //PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
+    localparam integer RADIO_HEADER_BYTES = 64;
+    localparam integer PAYLOAD_WORDS = 4096;                                // Payload length (in 16-bit words)
+    localparam integer FIFO_LENGTH = 2048;                                  // Longer than required length (power of 2)
     localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
-    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2); // 8 bytes (UDP header) + 2 bytes/word * payload_length
-    localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;      // 20 bytes (IP header) + UDP length
-    localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;     // 14 bytes (Ethernet header) + IP length
+    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2) + RADIO_HEADER_BYTES; // 8 bytes (UDP header) + 2 bytes/word * payload_length
+    localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;          // 20 bytes (IP header) + UDP length
+    localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;         // 14 bytes (Ethernet header) + IP length
 
-    localparam integer HEADER_STATE = 6;                                  // States to tx (words + headers)
-    localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;  // States to tx (words + headers)
+    localparam integer HEADER_STATE = (RADIO_HEADER_BYTES / 8) + 6;         // States to tx (words + headers)
+    localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;    // States to tx (words + headers)
 
-    localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;          // 16-bit words
-    localparam integer AXIS_PER_BUFFER = PAYLOAD_WORDS / WORDS_PER_AXIS;     // Ping-pong buffer size
+    localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;        // 16-bit words
+    localparam integer AXIS_PER_BUFFER = PAYLOAD_WORDS / WORDS_PER_AXIS;    // Ping-pong buffer size
 
     localparam integer FIFO_READ_DELAY = 2;
 
@@ -115,6 +133,16 @@ module adc_to_udp_stream_v1_0 #
     reg in_udp_header;
     wire update_packet;
 
+    // Radio packet header
+    wire [7:0] radio_header[RADIO_HEADER_BYTES-1:0];     // Radio packet header (see comment at top of file) 
+    reg [63:0] sent_counter;                    // 64-bit counter for sent packets
+    reg [31:0] num_subchannels;                 // Number of subchannels in packet
+    reg [31:0] pkt_samples;                     // Number of samples in packet
+    reg [15:0] bits_per_int;                    // Size of sample in bits
+    reg [7:0] is_complex;                       // Is data complex?
+    reg [63:0] first_sample_clock_count;        // Clock cycle count of first sample in packet
+    reg [63:0] pps_clock_count;                 // Clock cycle count of last PPS rising-edge
+
     // State machine signals
     reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
 
@@ -123,7 +151,6 @@ module adc_to_udp_stream_v1_0 #
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_out_data_prev;           
 
     // Timer to trigger packet transmission every 100ms
-    reg [63:0] sent_counter;                    // 64-bit counter for sent packets
     reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
     reg [31:0] full_buffer_counter;             // 32-bit counter for full buffers
     reg [31:0] user_reset;                       // State of user reset
@@ -365,6 +392,14 @@ module adc_to_udp_stream_v1_0 #
         udp_header[6][7:0] = 8'h00;   // Checksum placeholder 
         udp_header[7][7:0] = 8'h00;   // 
 
+        // Radio Header fields
+        num_subchannels[31:0] = 32'd1;
+        pkt_samples[31:0] = PAYLOAD_WORDS / 2; 
+        bits_per_int[15:0] = 16'd16;
+        is_complex[7:0] = 8'd1;
+        first_sample_clock_count[63:0] = 64'd0;
+        pps_clock_count[63:0] = 64'd0;
+
         // UDP Packet - initialize to 0
         for (i = 0; i < 42; i = i + 1) begin
             udp_packet_int[i] = 8'b0;
@@ -378,6 +413,72 @@ module adc_to_udp_stream_v1_0 #
     initial begin
         user_reset = 32'h1;
     end
+
+    // Assign Radio Header
+    assign radio_header[0] = sent_counter[7:0];
+    assign radio_header[1] = sent_counter[15:8];
+    assign radio_header[2] = sent_counter[23:16];
+    assign radio_header[3] = sent_counter[31:24];
+    assign radio_header[4] = sent_counter[39:32];
+    assign radio_header[5] = sent_counter[47:40];
+    assign radio_header[6] = sent_counter[55:48];
+    assign radio_header[7] = sent_counter[63:56];
+    assign radio_header[8]  = 8'd0;
+    assign radio_header[9]  = 8'd0;
+    assign radio_header[10] = 8'd0;
+    assign radio_header[11] = 8'd0;
+    assign radio_header[12] = 8'd0;
+    assign radio_header[13] = 8'd0;
+    assign radio_header[14] = 8'd0;
+    assign radio_header[15] = 8'd0;
+    assign radio_header[16] = 8'd0;
+    assign radio_header[17] = 8'd0;
+    assign radio_header[18] = 8'd0;
+    assign radio_header[19] = 8'd0;
+    assign radio_header[20] = 8'd0;
+    assign radio_header[21] = 8'd0;
+    assign radio_header[22] = 8'd0;
+    assign radio_header[23] = 8'd0;
+    assign radio_header[24] = 8'd0;
+    assign radio_header[25] = 8'd0;
+    assign radio_header[26] = 8'd0;
+    assign radio_header[27] = 8'd0;
+    assign radio_header[28] = num_subchannels[7:0];
+    assign radio_header[29] = num_subchannels[15:8];
+    assign radio_header[30] = num_subchannels[23:16];
+    assign radio_header[31] = num_subchannels[31:24];
+    assign radio_header[32] = pkt_samples[7:0];
+    assign radio_header[33] = pkt_samples[15:8];
+    assign radio_header[34] = pkt_samples[23:16];
+    assign radio_header[35] = pkt_samples[31:24];
+    assign radio_header[36] = bits_per_int[7:0];
+    assign radio_header[37] = bits_per_int[15:8];
+    assign radio_header[38] = is_complex[7:0];
+    assign radio_header[39] = 8'd0;
+    assign radio_header[40] = first_sample_clock_count[7:0];
+    assign radio_header[41] = first_sample_clock_count[15:8];
+    assign radio_header[42] = first_sample_clock_count[23:16];
+    assign radio_header[43] = first_sample_clock_count[31:24];
+    assign radio_header[44] = first_sample_clock_count[39:32];
+    assign radio_header[45] = first_sample_clock_count[47:40];
+    assign radio_header[46] = first_sample_clock_count[55:48];
+    assign radio_header[47] = first_sample_clock_count[63:56];
+    assign radio_header[48] = pps_clock_count[7:0];
+    assign radio_header[49] = pps_clock_count[15:8];
+    assign radio_header[50] = pps_clock_count[23:16];
+    assign radio_header[51] = pps_clock_count[31:24];
+    assign radio_header[52] = pps_clock_count[39:32];
+    assign radio_header[53] = pps_clock_count[47:40];
+    assign radio_header[54] = pps_clock_count[55:48];
+    assign radio_header[55] = pps_clock_count[63:56];
+    assign radio_header[56] = 8'd0;
+    assign radio_header[57] = 8'd0;
+    assign radio_header[58] = 8'd0;
+    assign radio_header[59] = 8'd0;
+    assign radio_header[60] = 8'd0;
+    assign radio_header[61] = 8'd0;
+    assign radio_header[62] = 8'd0;
+    assign radio_header[63] = 8'd0;
 
     // Calculate IP Checksum
     always @(posedge m00_axis_aclk) begin
@@ -466,10 +567,20 @@ module adc_to_udp_stream_v1_0 #
             udp_packet[3][63:0] <= {udp_packet_int[31], udp_packet_int[30], udp_packet_int[29], udp_packet_int[28], udp_packet_int[27], udp_packet_int[26], udp_packet_int[25], udp_packet_int[24]};
             udp_packet[4][63:0] <= {udp_packet_int[39], udp_packet_int[38], udp_packet_int[37], udp_packet_int[36], udp_packet_int[35], udp_packet_int[34], udp_packet_int[33], udp_packet_int[32]};
 
+            // Assign radio packet
+            udp_packet[5][63:0] <= {radio_header[5], radio_header[4],radio_header[3], radio_header[2], radio_header[1], radio_header[0], udp_packet_int[41], udp_packet_int[40]};
+            udp_packet[6][63:0] <= {radio_header[13], radio_header[12], radio_header[11], radio_header[10],radio_header[9], radio_header[8], radio_header[7], radio_header[6]};
+            udp_packet[7][63:0] <= {radio_header[21], radio_header[20], radio_header[19], radio_header[18], radio_header[17], radio_header[16], radio_header[15], radio_header[14]};
+            udp_packet[8][63:0] <= {radio_header[29], radio_header[28], radio_header[27], radio_header[26], radio_header[25], radio_header[24], radio_header[23], radio_header[22]};
+            udp_packet[9][63:0] <= {radio_header[37], radio_header[36], radio_header[35], radio_header[34], radio_header[33], radio_header[32], radio_header[31], radio_header[30]};
+            udp_packet[10][63:0] <= {radio_header[45], radio_header[44], radio_header[43], radio_header[42], radio_header[41], radio_header[40], radio_header[39], radio_header[38]};
+            udp_packet[11][63:0] <= {radio_header[53], radio_header[52], radio_header[51], radio_header[50], radio_header[49], radio_header[48], radio_header[47], radio_header[46]};
+            udp_packet[12][63:0] <= {radio_header[61], radio_header[60], radio_header[59], radio_header[58], radio_header[57], radio_header[56], radio_header[55], radio_header[54]};
+
             // Assign payload from input stream buffer
             // Align ADC data with next full AXIS transacation
             // Sequence # + size
-            udp_packet[5][63:0] <= {udp_packet_axis_data[63:16], udp_packet_int[41], udp_packet_int[40]};
+            udp_packet[13][63:0] <= {udp_packet_axis_data[63:16], radio_header[63], radio_header[62]};
         end
     end
 

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed May 28 13:17:41 2025" VIVADOVERSION="2021.1">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Mon Jun  2 12:13:25 2025" VIVADOVERSION="2021.1">
 
   <SYSTEMINFO ARCH="zynquplusRFSOC" BOARD="realdigital.org:rfsoc4x2:part0:1.0" DEVICE="xczu48dr" NAME="block_design" PACKAGE="ffvg1517" SPEEDGRADE="-2"/>
 
@@ -193,7 +193,7 @@
   </EXTERNALINTERFACES>
 
   <MODULES>
-    <MODULE COREREVISION="33" FULLNAME="/adc_to_udp_stream_A" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_A" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
+    <MODULE COREREVISION="34" FULLNAME="/adc_to_udp_stream_A" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_A" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
       <DOCUMENTS/>
       <ADDRESSBLOCKS>
         <ADDRESSBLOCK ACCESS="read-write" INTERFACE="S00_AXI" NAME="reg0" RANGE="4096" USAGE="register">
@@ -561,7 +561,7 @@
         </BUSINTERFACE>
       </BUSINTERFACES>
     </MODULE>
-    <MODULE COREREVISION="33" FULLNAME="/adc_to_udp_stream_B" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_B" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
+    <MODULE COREREVISION="34" FULLNAME="/adc_to_udp_stream_B" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_B" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
       <DOCUMENTS/>
       <ADDRESSBLOCKS>
         <ADDRESSBLOCK ACCESS="read-write" INTERFACE="S00_AXI" NAME="reg0" RANGE="4096" USAGE="register">
