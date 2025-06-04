@@ -246,11 +246,17 @@ proc create_root_design { parentCell } {
   # Create instance: adc_to_udp_stream_A, and set properties
   set adc_to_udp_stream_A [ create_bd_cell -type ip -vlnv user.org:user:adc_to_udp_stream:1.0 adc_to_udp_stream_A ]
   set_property -dict [ list \
+   CONFIG.C_S00_AXI_BASEADDR {0x00000000} \
+   CONFIG.C_S00_AXI_HIGHADDR {0x00000028} \
    CONFIG.UDP_PORT {60134} \
  ] $adc_to_udp_stream_A
 
   # Create instance: adc_to_udp_stream_B, and set properties
   set adc_to_udp_stream_B [ create_bd_cell -type ip -vlnv user.org:user:adc_to_udp_stream:1.0 adc_to_udp_stream_B ]
+  set_property -dict [ list \
+   CONFIG.C_S00_AXI_BASEADDR {0x00000000} \
+   CONFIG.C_S00_AXI_HIGHADDR {0x00000028} \
+ ] $adc_to_udp_stream_B
 
   # Create instance: axi_dma_cmac, and set properties
   set axi_dma_cmac [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_dma:7.1 axi_dma_cmac ]
@@ -354,6 +360,7 @@ proc create_root_design { parentCell } {
    CONFIG.ARB_ALGORITHM {3} \
    CONFIG.ARB_ON_MAX_XFERS {0} \
    CONFIG.ARB_ON_TLAST {1} \
+   CONFIG.HAS_TLAST {1} \
    CONFIG.ROUTING_MODE {0} \
  ] $axis_switch_0
 
