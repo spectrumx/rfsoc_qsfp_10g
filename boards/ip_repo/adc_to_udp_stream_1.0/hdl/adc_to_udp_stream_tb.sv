@@ -35,6 +35,10 @@ module adc_to_udp_stream_v1_0_tb;
     reg m00_axis_aclk;
     reg m00_axis_aresetn;
 
+    // Outgoing ADC clock and PPS
+    reg adc_clk;
+    reg pps_comp;
+
     // Signals for AXI4-Lite (S00_AXI)
     reg [C_S00_AXI_ADDR_WIDTH-1 : 0] s00_axi_awaddr;
     reg [2 : 0] s00_axi_awprot;
@@ -113,7 +117,10 @@ module adc_to_udp_stream_v1_0_tb;
         .m00_axis_tkeep(m00_axis_tkeep),
         .m00_axis_tuser(m00_axis_tuser),
         .m00_axis_tlast(m00_axis_tlast),
-        .m00_axis_tready(m00_axis_tready)
+        .m00_axis_tready(m00_axis_tready),
+
+        .adc_clk(adc_clk),
+        .pps_comp(pps_comp)
     );
 
     // Clock generation for AXI4-Lite (S00_AXI) (156.25MHz)
@@ -132,6 +139,18 @@ module adc_to_udp_stream_v1_0_tb;
     initial begin
         m00_axis_aclk = 0;
         forever #3.2ns m00_axis_aclk = ~m00_axis_aclk;  // Toggle 
+    end
+
+    // ADC Clock generation
+    initial begin
+        adc_clk = 0;
+        forever #2ns adc_clk = ~adc_clk;
+    end
+
+    // PPS generation (Run fast for simulation)
+    initial begin
+        pps_comp = 0;
+        forever #100us pps_comp = ~pps_comp;
     end
 
     // Reset generation

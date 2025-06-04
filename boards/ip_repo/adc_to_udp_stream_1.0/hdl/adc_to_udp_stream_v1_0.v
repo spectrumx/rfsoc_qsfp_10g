@@ -17,9 +17,9 @@
 //     uint16_t bits_per_int;
 //     unsigned is_complex : 1;
 //     unsigned reserved0 : 7;
-//     uint8_t reserved1;
-//     uint64_t reserved2;
-//     uint64_t reserved3;
+//     uint8_t samples_per_adc_clock;
+//     uint64_t first_sample_adc_clock;
+//     uint64_t pps_adc_clock;
 //     uint64_t reserved4;
 //   } __attribute__((__packed__)); 
 //
@@ -82,7 +82,11 @@ module adc_to_udp_stream_v1_0 #
     output wire [C_M00_AXIS_TKEEP_WIDTH-1 : 0] m00_axis_tkeep,
     output wire m00_axis_tuser,
     output wire m00_axis_tlast,
-    input wire m00_axis_tready
+    input wire m00_axis_tready,
+
+    // ADC Clock
+    input wire adc_clk,
+    input wire pps_comp
 );
 
     // Local params
@@ -111,6 +115,15 @@ module adc_to_udp_stream_v1_0 #
     wire fifo_1_read_en;
     wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_0_out_data;
     wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_1_out_data;
+
+    wire [11:0] fifo_0_wr_count;
+    wire [11:0] fifo_1_wr_count;
+    wire [11:0] fifo_0_rd_count;
+    wire [11:0] fifo_1_rd_count;
+    wire fifo_0_wr_rst_busy;
+    wire fifo_0_rd_rst_busy;
+    wire fifo_1_wr_rst_busy;
+    wire fifo_1_rd_rst_busy;
 
     // Define the UDP packet 
     reg [7:0] udp_packet_int[0:41];             // Ethernet frame, IP header, UDP header
@@ -143,11 +156,14 @@ module adc_to_udp_stream_v1_0 #
     reg [31:0] pkt_samples;                     // Number of samples in packet
     reg [15:0] bits_per_int;                    // Size of sample in bits
     reg [7:0] is_complex;                       // Is data complex?
-    reg [63:0] first_sample_clock_count;        // Clock cycle count of first sample in packet
+    reg [7:0] samples_per_adc_clock;            // Samples per adc clock
     reg [63:0] pps_clock_count;                 // Clock cycle count of last PPS rising-edge
+    reg [63:0] write_en_clock_count;       // Clock cycle count of first sample in packet
 
     // State machine signals
     reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
+    wire start_payload;
+    wire in_payload;
 
     // AXI bus signals
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet_axis_data;           
@@ -180,11 +196,62 @@ module adc_to_udp_stream_v1_0 #
     reg fifo_0_rst_busy_latched;
     reg fifo_1_rst_busy_latched;
 
-    wire fifo_0_rst_busy_combined;
-    wire fifo_1_rst_busy_combined;
+    wire fifo_0_rst_combined;
+    wire fifo_1_rst_combined;
 
     reg fifo_0_empty_latched;
     reg fifo_1_empty_latched;
+
+    // Clock counter
+    wire [63:0] adc_clk_count;
+    reg [63:0] fifo_0_write_en_clock_count;
+    reg [63:0] fifo_1_write_en_clock_count;
+
+    //////////////////////////////////////////////////////////////////////////
+    // Count rising edges of ADC clock when PPS goes high
+    //////////////////////////////////////////////////////////////////////////
+
+    // ADC clock counter
+    rising_edge_counter #(
+        .COUNTER_WIDTH(64)
+    ) adc_clk_counter_inst (
+        .clk_in(adc_clk),
+        .resetn(s01_axis_aresetn),
+        .edge_count(adc_clk_count)
+    );
+
+    // Capture adc_clk_count when pps_comp transitions high
+    always @(posedge pps_comp or negedge s01_axis_aresetn) begin
+        if (!s01_axis_aresetn) begin
+            pps_clock_count <= 64'h0;
+        end else begin
+            pps_clock_count <= adc_clk_count; // Capture on rising edge
+        end
+    end
+
+    // Capture adc_clk_count when write select transitions high 
+    always @(posedge fifo_0_write_en or negedge s01_axis_aresetn) begin
+        if (!s01_axis_aresetn) begin
+            fifo_0_write_en_clock_count <= 64'h0;
+        end else begin
+            fifo_0_write_en_clock_count <= adc_clk_count; // Capture on rising edge 
+        end
+    end
+
+    always @(posedge fifo_1_write_en or negedge s01_axis_aresetn) begin
+        if (!s01_axis_aresetn) begin
+            fifo_1_write_en_clock_count <= 64'h0;
+        end else begin
+            fifo_1_write_en_clock_count <= adc_clk_count; // Capture on rising edge 
+        end
+    end
+
+    always @(*) begin
+        if (buffer_select)
+            write_en_clock_count = fifo_0_write_en_clock_count;
+        else
+            write_en_clock_count = fifo_1_write_en_clock_count;
+    end
 
     //////////////////////////////////////////////////////////////////////////
     // Ping-pong buffer for incoming ADC samples
@@ -226,10 +293,10 @@ module adc_to_udp_stream_v1_0 #
     end
 
     // When full select other buffer
-    assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
-    assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
     assign fifo_0_rst_busy = fifo_0_wr_rst_busy || fifo_0_rd_rst_busy;
     assign fifo_1_rst_busy = fifo_1_wr_rst_busy || fifo_1_rd_rst_busy;
+    assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
+    assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
     assign buffer_select = fifo_0_full | fifo_0_full_reg;
     assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_0_rst_combined && !buffer_select;
     assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_1_rst_combined && buffer_select;
@@ -266,15 +333,6 @@ module adc_to_udp_stream_v1_0 #
     assign fifo_0_full_trigger = fifo_0_full_reg && !fifo_0_full_delay;
     assign fifo_1_full_trigger = fifo_1_full_reg && !fifo_1_full_delay;
     assign update_packet = fifo_0_full_trigger || fifo_1_full_trigger;
-
-    wire [11:0] fifo_0_wr_count;
-    wire [11:0] fifo_1_wr_count;
-    wire [11:0] fifo_0_rd_count;
-    wire [11:0] fifo_1_rd_count;
-    wire fifo_0_wr_rst_busy;
-    wire fifo_0_rd_rst_busy;
-    wire fifo_1_wr_rst_busy;
-    wire fifo_1_rd_rst_busy;
 
     xpm_fifo_async #(
         .FIFO_MEMORY_TYPE("block"),    // Use BRAM
@@ -397,14 +455,15 @@ module adc_to_udp_stream_v1_0 #
 
         // Radio Header fields
         sample_idx[63:0] = 64'd0;
-        sample_rate_numerator[63:0] = 64'd0;
-        sample_rate_denominator[63:0] = 64'd1;
+        sample_rate_numerator[63:0] = 64'd1228800000; // Default 1.2288Gsps
+        sample_rate_denominator[63:0] = 64'd16; // Default 16x divisor
         frequency_idx[31:0] = 32'd0;
         num_subchannels[31:0] = 32'd0;
         pkt_samples[31:0] = PAYLOAD_WORDS / 2; 
         bits_per_int[15:0] = 16'd16;
         is_complex[7:0] = 8'd1;
-        first_sample_clock_count[63:0] = 64'd0;
+        samples_per_adc_clock[7:0] = 8'd2;
+        write_en_clock_count[63:0] = 64'd0;
         pps_clock_count[63:0] = 64'd0;
 
         // UDP Packet - initialize to 0
@@ -462,14 +521,14 @@ module adc_to_udp_stream_v1_0 #
     assign radio_header[37] = bits_per_int[15:8];
     assign radio_header[38] = is_complex[7:0];
     assign radio_header[39] = 8'd0;
-    assign radio_header[40] = first_sample_clock_count[7:0];
-    assign radio_header[41] = first_sample_clock_count[15:8];
-    assign radio_header[42] = first_sample_clock_count[23:16];
-    assign radio_header[43] = first_sample_clock_count[31:24];
-    assign radio_header[44] = first_sample_clock_count[39:32];
-    assign radio_header[45] = first_sample_clock_count[47:40];
-    assign radio_header[46] = first_sample_clock_count[55:48];
-    assign radio_header[47] = first_sample_clock_count[63:56];
+    assign radio_header[40] = write_en_clock_count[7:0];
+    assign radio_header[41] = write_en_clock_count[15:8];
+    assign radio_header[42] = write_en_clock_count[23:16];
+    assign radio_header[43] = write_en_clock_count[31:24];
+    assign radio_header[44] = write_en_clock_count[39:32];
+    assign radio_header[45] = write_en_clock_count[47:40];
+    assign radio_header[46] = write_en_clock_count[55:48];
+    assign radio_header[47] = write_en_clock_count[63:56];
     assign radio_header[48] = pps_clock_count[7:0];
     assign radio_header[49] = pps_clock_count[15:8];
     assign radio_header[50] = pps_clock_count[23:16];
@@ -598,7 +657,6 @@ module adc_to_udp_stream_v1_0 #
     assign start_payload = (packet_state >= (HEADER_STATE-FIFO_READ_DELAY)) && (packet_state <= FINAL_STATE);
     assign in_payload = (packet_state >= HEADER_STATE) && (packet_state <= FINAL_STATE);
 
-    wire in_payload;
     reg udp_packet_axis_valid;
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn || user_reset) begin

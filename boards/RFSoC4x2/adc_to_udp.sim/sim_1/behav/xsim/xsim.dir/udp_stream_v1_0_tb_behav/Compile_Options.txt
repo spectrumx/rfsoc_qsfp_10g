@@ -1,0 +1,1 @@
+-wto "d4dbb68866ff4b9180950033100825b1" --incr --debug "typical" --relax --mt "8" -L "xil_defaultlib" -L "uvm" -L "unisims_ver" -L "unimacro_ver" -L "secureip" --snapshot "udp_stream_v1_0_tb_behav" "xil_defaultlib.udp_stream_v1_0_tb" "xil_defaultlib.glbl" -log "elaborate.log" 
