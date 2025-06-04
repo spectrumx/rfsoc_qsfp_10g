@@ -64,6 +64,10 @@ def main(args):
     ol.rfdc.adc_tiles[tile].blocks[1].UpdateEvent(xrfdc.EVENT_MIXER)
     ol.rfdc.adc_tiles[tile].SetupFIFO(True)
 
+    # Configure UDP Header for new sample rate
+    ol.adc_to_udp_stream_A.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
+    ol.adc_to_udp_stream_B.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
+
     print(f"Starting UDP stream on: {args.channels}")
     if 'A' in args.channels:
         ol.adc_to_udp_stream_A.register_map.USER_RESET = 0

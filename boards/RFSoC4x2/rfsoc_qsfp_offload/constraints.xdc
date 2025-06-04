@@ -3,8 +3,8 @@ set_property PACKAGE_PIN AA34      [get_ports "diff_clock_rtl_clk_n"] ;# Bank 12
 set_property PACKAGE_PIN AA33      [get_ports "diff_clock_rtl_clk_p"] ;# Bank 128 - MGTREFCLK0P_128 RFSoC4x2 GT CLK
 
 ## USER SLIDE SWITCH
-set_property PACKAGE_PIN AN13 [ get_ports "sw_0" ]
-set_property IOSTANDARD LVCMOS18 [ get_ports "sw_0" ]
+#set_property PACKAGE_PIN AN13 [ get_ports "sw_0" ]
+#set_property IOSTANDARD LVCMOS18 [ get_ports "sw_0" ]
 
 set_property PACKAGE_PIN AU12 [ get_ports "sw_1" ]
 set_property IOSTANDARD LVCMOS18 [ get_ports "sw_1" ]
@@ -29,8 +29,8 @@ set_property IOSTANDARD LVCMOS18 [ get_ports "led_3" ]
 set_property PACKAGE_PIN AM22 [ get_ports "qsfp_intl_ls" ]
 set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_intl_ls" ]
 
-set_property PACKAGE_PIN AL21 [ get_ports "qsfp_resetl_ls" ]
-set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_resetl_ls" ]
+#set_property PACKAGE_PIN AL21 [ get_ports "qsfp_resetl_ls" ]
+#set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_resetl_ls" ]
 
 set_property PACKAGE_PIN AN22 [ get_ports "qsfp_lpmode_ls" ]
 set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_lpmode_ls" ]
@@ -41,3 +41,4 @@ set_property IOSTANDARD LVCMOS18 [ get_ports "qsfp_modsell_ls" ]
 ## PPS
 set_property PACKAGE_PIN AJ13 [ get_ports "pps_comp_in" ]
 set_property IOSTANDARD LVCMOS18 [ get_ports "pps_comp_in" ]
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets pps_comp_in_IBUF_inst/O]

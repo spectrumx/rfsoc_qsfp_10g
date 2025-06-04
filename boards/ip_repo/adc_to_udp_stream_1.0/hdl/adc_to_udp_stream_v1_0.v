@@ -6,6 +6,23 @@
 //
 //  Assumes constant stream from 64-bit input
 //
+// Expected Packet header
+//   struct RfPktHeader {
+//     uint64_t sample_idx;
+//     uint64_t sample_rate_numerator;
+//     uint64_t sample_rate_denominator;
+//     uint32_t frequency_idx;
+//     uint32_t num_subchannels;
+//     uint32_t pkt_samples;
+//     uint16_t bits_per_int;
+//     unsigned is_complex : 1;
+//     unsigned reserved0 : 7;
+//     uint8_t samples_per_adc_clock;
+//     uint64_t first_sample_adc_clock;
+//     uint64_t pps_adc_clock;
+//     uint64_t reserved4;
+//   } __attribute__((__packed__)); 
+//
 ///////////////////////////////////////////////////////////////////////////////
 
 `timescale 1 ns / 1 ps
@@ -65,22 +82,27 @@ module adc_to_udp_stream_v1_0 #
     output wire [C_M00_AXIS_TKEEP_WIDTH-1 : 0] m00_axis_tkeep,
     output wire m00_axis_tuser,
     output wire m00_axis_tlast,
-    input wire m00_axis_tready
+    input wire m00_axis_tready,
+
+    // ADC Clock
+    input wire adc_clk,
+    input wire pps_comp
 );
 
     // Local params
-    localparam integer PAYLOAD_WORDS = 4096;                            // Payload length (in 16-bit words)
-    localparam integer FIFO_LENGTH = 2048; //2048; //PAYLOAD_WORDS / 4 + FIFO_BUFFER ;            // Payload length (in 16-bit words) + buffer
+    localparam integer RADIO_HEADER_BYTES = 64;
+    localparam integer PAYLOAD_WORDS = 4096;                                // Payload length (in 16-bit words)
+    localparam integer FIFO_LENGTH = 2048;                                  // Longer than required length (power of 2)
     localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
-    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2); // 8 bytes (UDP header) + 2 bytes/word * payload_length
-    localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;      // 20 bytes (IP header) + UDP length
-    localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;     // 14 bytes (Ethernet header) + IP length
+    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2) + RADIO_HEADER_BYTES; // 8 bytes (UDP header) + 2 bytes/word * payload_length
+    localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;          // 20 bytes (IP header) + UDP length
+    localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;         // 14 bytes (Ethernet header) + IP length
 
-    localparam integer HEADER_STATE = 6;                                  // States to tx (words + headers)
-    localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;  // States to tx (words + headers)
+    localparam integer HEADER_STATE = (RADIO_HEADER_BYTES / 8) + 6;         // States to tx (words + headers)
+    localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;    // States to tx (words + headers)
 
-    localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;          // 16-bit words
-    localparam integer AXIS_PER_BUFFER = PAYLOAD_WORDS / WORDS_PER_AXIS;     // Ping-pong buffer size
+    localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;        // 16-bit words
+    localparam integer AXIS_PER_BUFFER = PAYLOAD_WORDS / WORDS_PER_AXIS;    // Ping-pong buffer size
 
     localparam integer FIFO_READ_DELAY = 2;
 
@@ -93,6 +115,15 @@ module adc_to_udp_stream_v1_0 #
     wire fifo_1_read_en;
     wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_0_out_data;
     wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_1_out_data;
+
+    wire [11:0] fifo_0_wr_count;
+    wire [11:0] fifo_1_wr_count;
+    wire [11:0] fifo_0_rd_count;
+    wire [11:0] fifo_1_rd_count;
+    wire fifo_0_wr_rst_busy;
+    wire fifo_0_rd_rst_busy;
+    wire fifo_1_wr_rst_busy;
+    wire fifo_1_rd_rst_busy;
 
     // Define the UDP packet 
     reg [7:0] udp_packet_int[0:41];             // Ethernet frame, IP header, UDP header
@@ -115,15 +146,30 @@ module adc_to_udp_stream_v1_0 #
     reg in_udp_header;
     wire update_packet;
 
+    // Radio packet header
+    wire [7:0] radio_header[RADIO_HEADER_BYTES-1:0];     // Radio packet header (see comment at top of file) 
+    reg [63:0] sample_idx;                      // 64-bit counter for sent packets
+    reg [63:0] sample_rate_numerator;           // Sample rate numerator
+    reg [63:0] sample_rate_denominator;         // Sample rate denominator
+    reg [31:0] frequency_idx;                   // Frequency index
+    reg [31:0] num_subchannels;                 // Number of subchannels in packet
+    reg [31:0] pkt_samples;                     // Number of samples in packet
+    reg [15:0] bits_per_int;                    // Size of sample in bits
+    reg [7:0] is_complex;                       // Is data complex?
+    reg [7:0] samples_per_adc_clock;            // Samples per adc clock
+    reg [63:0] pps_clock_count;                 // Clock cycle count of last PPS rising-edge
+    reg [63:0] write_en_clock_count;       // Clock cycle count of first sample in packet
+
     // State machine signals
     reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
+    wire start_payload;
+    wire in_payload;
 
     // AXI bus signals
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet_axis_data;           
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_out_data_prev;           
 
     // Timer to trigger packet transmission every 100ms
-    reg [63:0] sent_counter;                    // 64-bit counter for sent packets
     reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
     reg [31:0] full_buffer_counter;             // 32-bit counter for full buffers
     reg [31:0] user_reset;                       // State of user reset
@@ -150,11 +196,62 @@ module adc_to_udp_stream_v1_0 #
     reg fifo_0_rst_busy_latched;
     reg fifo_1_rst_busy_latched;
 
-    wire fifo_0_rst_busy_combined;
-    wire fifo_1_rst_busy_combined;
+    wire fifo_0_rst_combined;
+    wire fifo_1_rst_combined;
 
     reg fifo_0_empty_latched;
     reg fifo_1_empty_latched;
+
+    // Clock counter
+    wire [63:0] adc_clk_count;
+    reg [63:0] fifo_0_write_en_clock_count;
+    reg [63:0] fifo_1_write_en_clock_count;
+
+    //////////////////////////////////////////////////////////////////////////
+    // Count rising edges of ADC clock when PPS goes high
+    //////////////////////////////////////////////////////////////////////////
+
+    // ADC clock counter
+    rising_edge_counter #(
+        .COUNTER_WIDTH(64)
+    ) adc_clk_counter_inst (
+        .clk_in(adc_clk),
+        .resetn(s01_axis_aresetn),
+        .edge_count(adc_clk_count)
+    );
+
+    // Capture adc_clk_count when pps_comp transitions high
+    always @(posedge pps_comp or negedge s01_axis_aresetn) begin
+        if (!s01_axis_aresetn) begin
+            pps_clock_count <= 64'h0;
+        end else begin
+            pps_clock_count <= adc_clk_count; // Capture on rising edge
+        end
+    end
+
+    // Capture adc_clk_count when write select transitions high 
+    always @(posedge fifo_0_write_en or negedge s01_axis_aresetn) begin
+        if (!s01_axis_aresetn) begin
+            fifo_0_write_en_clock_count <= 64'h0;
+        end else begin
+            fifo_0_write_en_clock_count <= adc_clk_count; // Capture on rising edge 
+        end
+    end
+
+    always @(posedge fifo_1_write_en or negedge s01_axis_aresetn) begin
+        if (!s01_axis_aresetn) begin
+            fifo_1_write_en_clock_count <= 64'h0;
+        end else begin
+            fifo_1_write_en_clock_count <= adc_clk_count; // Capture on rising edge 
+        end
+    end
+
+    always @(*) begin
+        if (buffer_select)
+            write_en_clock_count = fifo_0_write_en_clock_count;
+        else
+            write_en_clock_count = fifo_1_write_en_clock_count;
+    end
 
     //////////////////////////////////////////////////////////////////////////
     // Ping-pong buffer for incoming ADC samples
@@ -196,10 +293,10 @@ module adc_to_udp_stream_v1_0 #
     end
 
     // When full select other buffer
-    assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
-    assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
     assign fifo_0_rst_busy = fifo_0_wr_rst_busy || fifo_0_rd_rst_busy;
     assign fifo_1_rst_busy = fifo_1_wr_rst_busy || fifo_1_rd_rst_busy;
+    assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
+    assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
     assign buffer_select = fifo_0_full | fifo_0_full_reg;
     assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_0_rst_combined && !buffer_select;
     assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_1_rst_combined && buffer_select;
@@ -236,15 +333,6 @@ module adc_to_udp_stream_v1_0 #
     assign fifo_0_full_trigger = fifo_0_full_reg && !fifo_0_full_delay;
     assign fifo_1_full_trigger = fifo_1_full_reg && !fifo_1_full_delay;
     assign update_packet = fifo_0_full_trigger || fifo_1_full_trigger;
-
-    wire [11:0] fifo_0_wr_count;
-    wire [11:0] fifo_1_wr_count;
-    wire [11:0] fifo_0_rd_count;
-    wire [11:0] fifo_1_rd_count;
-    wire fifo_0_wr_rst_busy;
-    wire fifo_0_rd_rst_busy;
-    wire fifo_1_wr_rst_busy;
-    wire fifo_1_rd_rst_busy;
 
     xpm_fifo_async #(
         .FIFO_MEMORY_TYPE("block"),    // Use BRAM
@@ -365,6 +453,19 @@ module adc_to_udp_stream_v1_0 #
         udp_header[6][7:0] = 8'h00;   // Checksum placeholder 
         udp_header[7][7:0] = 8'h00;   // 
 
+        // Radio Header fields
+        sample_idx[63:0] = 64'd0;
+        sample_rate_numerator[63:0] = 64'd1228800000; // Default 1.2288Gsps
+        sample_rate_denominator[63:0] = 64'd16; // Default 16x divisor
+        frequency_idx[31:0] = 32'd0;
+        num_subchannels[31:0] = 32'd0;
+        pkt_samples[31:0] = PAYLOAD_WORDS / 2; 
+        bits_per_int[15:0] = 16'd16;
+        is_complex[7:0] = 8'd1;
+        samples_per_adc_clock[7:0] = 8'd2;
+        write_en_clock_count[63:0] = 64'd0;
+        pps_clock_count[63:0] = 64'd0;
+
         // UDP Packet - initialize to 0
         for (i = 0; i < 42; i = i + 1) begin
             udp_packet_int[i] = 8'b0;
@@ -378,6 +479,72 @@ module adc_to_udp_stream_v1_0 #
     initial begin
         user_reset = 32'h1;
     end
+
+    // Assign Radio Header
+    assign radio_header[0] = sample_idx[7:0];
+    assign radio_header[1] = sample_idx[15:8];
+    assign radio_header[2] = sample_idx[23:16];
+    assign radio_header[3] = sample_idx[31:24];
+    assign radio_header[4] = sample_idx[39:32];
+    assign radio_header[5] = sample_idx[47:40];
+    assign radio_header[6] = sample_idx[55:48];
+    assign radio_header[7] = sample_idx[63:56];
+    assign radio_header[8] = sample_rate_numerator[7:0];
+    assign radio_header[9] = sample_rate_numerator[15:8];
+    assign radio_header[10] = sample_rate_numerator[23:16];
+    assign radio_header[11] = sample_rate_numerator[31:24];
+    assign radio_header[12] = sample_rate_numerator[39:32];
+    assign radio_header[13] = sample_rate_numerator[47:40];
+    assign radio_header[14] = sample_rate_numerator[55:48];
+    assign radio_header[15] = sample_rate_numerator[63:56];
+    assign radio_header[16] = sample_rate_denominator[7:0];
+    assign radio_header[17] = sample_rate_denominator[15:8];
+    assign radio_header[18] = sample_rate_denominator[23:16];
+    assign radio_header[19] = sample_rate_denominator[31:24];
+    assign radio_header[20] = sample_rate_denominator[39:32];
+    assign radio_header[21] = sample_rate_denominator[47:40];
+    assign radio_header[22] = sample_rate_denominator[55:48];
+    assign radio_header[23] = sample_rate_denominator[63:56];
+    assign radio_header[24] = frequency_idx[7:0];
+    assign radio_header[25] = frequency_idx[15:8];
+    assign radio_header[26] = frequency_idx[23:16]; 
+    assign radio_header[27] = frequency_idx[31:24];
+    assign radio_header[28] = num_subchannels[7:0];
+    assign radio_header[29] = num_subchannels[15:8];
+    assign radio_header[30] = num_subchannels[23:16];
+    assign radio_header[31] = num_subchannels[31:24];
+    assign radio_header[32] = pkt_samples[7:0];
+    assign radio_header[33] = pkt_samples[15:8];
+    assign radio_header[34] = pkt_samples[23:16];
+    assign radio_header[35] = pkt_samples[31:24];
+    assign radio_header[36] = bits_per_int[7:0];
+    assign radio_header[37] = bits_per_int[15:8];
+    assign radio_header[38] = is_complex[7:0];
+    assign radio_header[39] = 8'd0;
+    assign radio_header[40] = write_en_clock_count[7:0];
+    assign radio_header[41] = write_en_clock_count[15:8];
+    assign radio_header[42] = write_en_clock_count[23:16];
+    assign radio_header[43] = write_en_clock_count[31:24];
+    assign radio_header[44] = write_en_clock_count[39:32];
+    assign radio_header[45] = write_en_clock_count[47:40];
+    assign radio_header[46] = write_en_clock_count[55:48];
+    assign radio_header[47] = write_en_clock_count[63:56];
+    assign radio_header[48] = pps_clock_count[7:0];
+    assign radio_header[49] = pps_clock_count[15:8];
+    assign radio_header[50] = pps_clock_count[23:16];
+    assign radio_header[51] = pps_clock_count[31:24];
+    assign radio_header[52] = pps_clock_count[39:32];
+    assign radio_header[53] = pps_clock_count[47:40];
+    assign radio_header[54] = pps_clock_count[55:48];
+    assign radio_header[55] = pps_clock_count[63:56];
+    assign radio_header[56] = 8'd0;
+    assign radio_header[57] = 8'd0;
+    assign radio_header[58] = 8'd0;
+    assign radio_header[59] = 8'd0;
+    assign radio_header[60] = 8'd0;
+    assign radio_header[61] = 8'd0;
+    assign radio_header[62] = 8'd0;
+    assign radio_header[63] = 8'd0;
 
     // Calculate IP Checksum
     always @(posedge m00_axis_aclk) begin
@@ -466,10 +633,20 @@ module adc_to_udp_stream_v1_0 #
             udp_packet[3][63:0] <= {udp_packet_int[31], udp_packet_int[30], udp_packet_int[29], udp_packet_int[28], udp_packet_int[27], udp_packet_int[26], udp_packet_int[25], udp_packet_int[24]};
             udp_packet[4][63:0] <= {udp_packet_int[39], udp_packet_int[38], udp_packet_int[37], udp_packet_int[36], udp_packet_int[35], udp_packet_int[34], udp_packet_int[33], udp_packet_int[32]};
 
+            // Assign radio packet
+            udp_packet[5][63:0] <= {radio_header[5], radio_header[4],radio_header[3], radio_header[2], radio_header[1], radio_header[0], udp_packet_int[41], udp_packet_int[40]};
+            udp_packet[6][63:0] <= {radio_header[13], radio_header[12], radio_header[11], radio_header[10],radio_header[9], radio_header[8], radio_header[7], radio_header[6]};
+            udp_packet[7][63:0] <= {radio_header[21], radio_header[20], radio_header[19], radio_header[18], radio_header[17], radio_header[16], radio_header[15], radio_header[14]};
+            udp_packet[8][63:0] <= {radio_header[29], radio_header[28], radio_header[27], radio_header[26], radio_header[25], radio_header[24], radio_header[23], radio_header[22]};
+            udp_packet[9][63:0] <= {radio_header[37], radio_header[36], radio_header[35], radio_header[34], radio_header[33], radio_header[32], radio_header[31], radio_header[30]};
+            udp_packet[10][63:0] <= {radio_header[45], radio_header[44], radio_header[43], radio_header[42], radio_header[41], radio_header[40], radio_header[39], radio_header[38]};
+            udp_packet[11][63:0] <= {radio_header[53], radio_header[52], radio_header[51], radio_header[50], radio_header[49], radio_header[48], radio_header[47], radio_header[46]};
+            udp_packet[12][63:0] <= {radio_header[61], radio_header[60], radio_header[59], radio_header[58], radio_header[57], radio_header[56], radio_header[55], radio_header[54]};
+
             // Assign payload from input stream buffer
             // Align ADC data with next full AXIS transacation
             // Sequence # + size
-            udp_packet[5][63:0] <= {udp_packet_axis_data[63:16], udp_packet_int[41], udp_packet_int[40]};
+            udp_packet[13][63:0] <= {udp_packet_axis_data[63:16], radio_header[63], radio_header[62]};
         end
     end
 
@@ -480,11 +657,10 @@ module adc_to_udp_stream_v1_0 #
     assign start_payload = (packet_state >= (HEADER_STATE-FIFO_READ_DELAY)) && (packet_state <= FINAL_STATE);
     assign in_payload = (packet_state >= HEADER_STATE) && (packet_state <= FINAL_STATE);
 
-    wire in_payload;
     reg udp_packet_axis_valid;
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn || user_reset) begin
-            sent_counter <= 64'd0;
+            sample_idx <= 64'd0;
             packet_state <= 16'd0;
             fifo_0_read_en_latched <= 0;
             fifo_1_read_en_latched <= 0;
@@ -497,7 +673,7 @@ module adc_to_udp_stream_v1_0 #
                 // Reset state to start a new packet transmission
                 packet_state <= 16'd0;
                 start_udp_header <= 1'b1;
-                sent_counter <= sent_counter + 1;       // Increment packets sent counter
+                sample_idx <= sample_idx + 1;       // Increment packets sent counter
             end else if (m00_axis_tready) begin
                 if (start_udp_header) begin
                     // Wait one cycle for packet to update
@@ -600,7 +776,7 @@ module adc_to_udp_stream_v1_0 #
     assign s00_axi_arready = 1'b1;
     assign s00_axi_rresp = 2'b00;
 
-    // Write Logic: when AXI4 Write transaction occurs, write the data to char_reg
+    // Write Logic
     always @(posedge s00_axi_aclk) begin
         if (~s00_axi_aresetn) begin
             eth_dst_mac[0] = 8'hFF;
@@ -613,6 +789,8 @@ module adc_to_udp_stream_v1_0 #
             eth_dst_mac_lsb[1] = 8'h00;
             eth_dst_mac_lsb[2] = 8'h00;
             eth_dst_mac_lsb[3] = 8'h00;
+            sample_rate_numerator[63:0] = 64'd0;
+            sample_rate_denominator[63:0] = 64'd1;
         end else if (s00_axi_awvalid && s00_axi_wvalid) begin
             case (s00_axi_awaddr)
                 32'h0000_0000: user_reset[31:0] <= s00_axi_wdata[31:0];
@@ -657,6 +835,18 @@ module adc_to_udp_stream_v1_0 #
                     udp_header[3][7:0] <= s00_axi_wdata[7:0];
                     udp_header[2][7:0] <= s00_axi_wdata[15:8];
                 end
+                32'h0000_0030: begin 
+                    sample_rate_numerator[31:0] <= s00_axi_wdata[31:0];
+                end
+                32'h0000_0034: begin 
+                    sample_rate_numerator[63:32] <= s00_axi_wdata[31:0];
+                end
+                32'h0000_0038: begin 
+                    sample_rate_denominator[31:0] <= s00_axi_wdata[31:0];
+                end
+                32'h0000_003C: begin 
+                    sample_rate_denominator[63:32] <= s00_axi_wdata[31:0];
+                end
                 default: begin
                     // Do nothing
                 end
@@ -671,7 +861,7 @@ module adc_to_udp_stream_v1_0 #
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
                 32'h0000_0000: s00_axi_rdata = user_reset; 
-                32'h0000_0004: s00_axi_rdata = sent_counter[31:0];       
+                32'h0000_0004: s00_axi_rdata = sample_idx[31:0];       
                 32'h0000_0008: s00_axi_rdata = received_counter;           
                 32'h0000_000C: begin
                     s00_axi_rdata = {eth_dst_mac[2], eth_dst_mac[3], eth_dst_mac[4], eth_dst_mac[5]};
@@ -697,6 +887,10 @@ module adc_to_udp_stream_v1_0 #
                 end
                 32'h0000_0024: s00_axi_rdata = full_buffer_counter;
                 32'h0000_0028: s00_axi_rdata = {16'b0, 5'b0, m00_axis_aresetn, m00_axis_tready, m00_axis_tvalid, 5'b0, s01_axis_aresetn, s01_axis_tready, s01_axis_tvalid};
+                32'h0000_0030: s00_axi_rdata = sample_rate_numerator[31:0];
+                32'h0000_0034: s00_axi_rdata = sample_rate_numerator[63:32];
+                32'h0000_0038: s00_axi_rdata = sample_rate_denominator[31:0];
+                32'h0000_003C: s00_axi_rdata = sample_rate_denominator[63:32];
                 default: s00_axi_rdata = 32'b0;
             endcase
         end
