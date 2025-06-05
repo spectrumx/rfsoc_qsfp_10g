@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed Jun  4 18:45:04 2025" VIVADOVERSION="2021.1">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Thu Jun  5 06:45:55 2025" VIVADOVERSION="2021.1">
 
   <SYSTEMINFO ARCH="zynquplusRFSOC" BOARD="realdigital.org:rfsoc4x2:part0:1.0" DEVICE="xczu48dr" NAME="block_design" PACKAGE="ffvg1517" SPEEDGRADE="-2"/>
 
@@ -193,7 +193,7 @@
   </EXTERNALINTERFACES>
 
   <MODULES>
-    <MODULE COREREVISION="39" FULLNAME="/adc_to_udp_stream_A" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_A" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
+    <MODULE COREREVISION="41" FULLNAME="/adc_to_udp_stream_A" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_A" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
       <DOCUMENTS/>
       <ADDRESSBLOCKS>
         <ADDRESSBLOCK ACCESS="read-write" INTERFACE="S00_AXI" NAME="reg0" RANGE="4096" USAGE="register">
@@ -205,11 +205,11 @@
               <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
-            <REGISTER NAME="SENT_COUNTER">
-              <PROPERTY NAME="DESCRIPTION" VALUE="Sent Ethernet Frames"/>
+            <REGISTER NAME="FREQUENCY_IDX">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Center Frequency"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="4"/>
               <PROPERTY NAME="SIZE" VALUE="32"/>
-              <PROPERTY NAME="ACCESS" VALUE="read-only"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
             <REGISTER NAME="RECEIVED_COUNTER">
@@ -261,18 +261,18 @@
               <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
-            <REGISTER NAME="FULL_BUFFER_COUNTER">
-              <PROPERTY NAME="DESCRIPTION" VALUE="Increments when input FIFO fills"/>
+            <REGISTER NAME="SAMPLE_IDX_OFFSET_LSB">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Sample count since epoch"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="36"/>
               <PROPERTY NAME="SIZE" VALUE="32"/>
-              <PROPERTY NAME="ACCESS" VALUE="read-only"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
-            <REGISTER NAME="AXIS_STATUS">
-              <PROPERTY NAME="DESCRIPTION" VALUE="AXIS Bus Status"/>
+            <REGISTER NAME="SAMPLE_IDX_OFFSET_MSB">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Sample count since epoch"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="40"/>
               <PROPERTY NAME="SIZE" VALUE="32"/>
-              <PROPERTY NAME="ACCESS" VALUE="read-only"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
             <REGISTER NAME="SAMPLE_RATE_NUMERATOR_LSB">
@@ -599,7 +599,7 @@
         </BUSINTERFACE>
       </BUSINTERFACES>
     </MODULE>
-    <MODULE COREREVISION="39" FULLNAME="/adc_to_udp_stream_B" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_B" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
+    <MODULE COREREVISION="41" FULLNAME="/adc_to_udp_stream_B" HWVERSION="1.0" INSTANCE="adc_to_udp_stream_B" IPTYPE="PERIPHERAL" IS_ENABLE="1" MODCLASS="PERIPHERAL" MODTYPE="adc_to_udp_stream" VLNV="user.org:user:adc_to_udp_stream:1.0">
       <DOCUMENTS/>
       <ADDRESSBLOCKS>
         <ADDRESSBLOCK ACCESS="read-write" INTERFACE="S00_AXI" NAME="reg0" RANGE="4096" USAGE="register">
@@ -611,11 +611,11 @@
               <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
-            <REGISTER NAME="SENT_COUNTER">
-              <PROPERTY NAME="DESCRIPTION" VALUE="Sent Ethernet Frames"/>
+            <REGISTER NAME="FREQUENCY_IDX">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Center Frequency"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="4"/>
               <PROPERTY NAME="SIZE" VALUE="32"/>
-              <PROPERTY NAME="ACCESS" VALUE="read-only"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
             <REGISTER NAME="RECEIVED_COUNTER">
@@ -667,18 +667,18 @@
               <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
-            <REGISTER NAME="FULL_BUFFER_COUNTER">
-              <PROPERTY NAME="DESCRIPTION" VALUE="Increments when input FIFO fills"/>
+            <REGISTER NAME="SAMPLE_IDX_OFFSET_LSB">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Sample count since epoch"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="36"/>
               <PROPERTY NAME="SIZE" VALUE="32"/>
-              <PROPERTY NAME="ACCESS" VALUE="read-only"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
-            <REGISTER NAME="AXIS_STATUS">
-              <PROPERTY NAME="DESCRIPTION" VALUE="AXIS Bus Status"/>
+            <REGISTER NAME="SAMPLE_IDX_OFFSET_MSB">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Sample count since epoch"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="40"/>
               <PROPERTY NAME="SIZE" VALUE="32"/>
-              <PROPERTY NAME="ACCESS" VALUE="read-only"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
             </REGISTER>
             <REGISTER NAME="SAMPLE_RATE_NUMERATOR_LSB">
