@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed Jun  4 15:01:57 2025" VIVADOVERSION="2021.1">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed Jun  4 18:45:04 2025" VIVADOVERSION="2021.1">
 
   <SYSTEMINFO ARCH="zynquplusRFSOC" BOARD="realdigital.org:rfsoc4x2:part0:1.0" DEVICE="xczu48dr" NAME="block_design" PACKAGE="ffvg1517" SPEEDGRADE="-2"/>
 
@@ -22035,8 +22035,8 @@
         <PARAMETER NAME="SUBPRESET1" VALUE="Custom"/>
         <PARAMETER NAME="SUBPRESET2" VALUE="Custom"/>
         <PARAMETER NAME="PSU_UIPARAM_GENERATE_SUMMARY" VALUE="&lt;Select>"/>
-        <PARAMETER NAME="PSU_MIO_TREE_PERIPHERALS"/>
-        <PARAMETER NAME="PSU_MIO_TREE_SIGNALS"/>
+        <PARAMETER NAME="PSU_MIO_TREE_PERIPHERALS" VALUE="#############################################################################"/>
+        <PARAMETER NAME="PSU_MIO_TREE_SIGNALS" VALUE="#############################################################################"/>
         <PARAMETER NAME="PSU_PERIPHERAL_BOARD_PRESET"/>
         <PARAMETER NAME="PSU__NAND__PERIPHERAL__IO" VALUE="&lt;Select>"/>
         <PARAMETER NAME="PSU__NAND__PERIPHERAL__ENABLE" VALUE="0"/>
