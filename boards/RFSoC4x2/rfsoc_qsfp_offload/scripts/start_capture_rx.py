@@ -77,7 +77,7 @@ def main(args):
 
     # Set starting sample
     start_time = time.time()
-    samples_since_epoch = int(start_time * (ADC_SAMPLE_FREQUENCY / ADC_DECIMATION))
+    samples_since_epoch = int(start_time * ((ADC_SAMPLE_FREQUENCY * 1e6) / ADC_DECIMATION))
     samples_since_epoch_lsb = samples_since_epoch & 0xFFFFFFFF
     samples_since_epoch_msb = samples_since_epoch >> 32
     ol.adc_to_udp_stream_A.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
