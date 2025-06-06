@@ -1,6 +1,10 @@
 
 { 
+<<<<<<< HEAD
     crc :  997833168251237758  , 
+=======
+    crc :  8587091011747706910  , 
+>>>>>>> origin/master
     ccp_crc :  0  , 
     cmdline : " -wto d4dbb68866ff4b9180950033100825b1 --incr --debug typical --relax --mt 8 -L xil_defaultlib -L uvm -L unisims_ver -L unimacro_ver -L secureip -L xpm --snapshot adc_to_udp_stream_v1_0_tb_behav xil_defaultlib.adc_to_udp_stream_v1_0_tb xil_defaultlib.glbl" , 
     buildDate : "Jun 10 2021" , 
