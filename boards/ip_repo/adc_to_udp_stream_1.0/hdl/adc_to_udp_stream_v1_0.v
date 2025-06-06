@@ -8,11 +8,7 @@
 //
 // Expected Packet header
 //   struct RfPktHeader {
-<<<<<<< HEAD
-//     uint64_t sample_idx; Swap to sample index, not packet index 
-=======
-//     uint64_t sample_idx;
->>>>>>> origin/master
+//     uint64_t sample_idx; 
 //     uint64_t sample_rate_numerator;
 //     uint64_t sample_rate_denominator;
 //     uint32_t frequency_idx;
@@ -152,11 +148,7 @@ module adc_to_udp_stream_v1_0 #
 
     // Radio packet header
     wire [7:0] radio_header[RADIO_HEADER_BYTES-1:0];     // Radio packet header (see comment at top of file) 
-<<<<<<< HEAD
     reg [63:0] sample_idx;                      // Index of sample
-=======
-    reg [63:0] sample_idx;                      // 64-bit counter for sent packets
->>>>>>> origin/master
     reg [63:0] sample_rate_numerator;           // Sample rate numerator
     reg [63:0] sample_rate_denominator;         // Sample rate denominator
     reg [31:0] frequency_idx;                   // Frequency index
@@ -166,14 +158,10 @@ module adc_to_udp_stream_v1_0 #
     reg [7:0] is_complex;                       // Is data complex?
     reg [7:0] samples_per_adc_clock;            // Samples per adc clock
     reg [63:0] pps_clock_count;                 // Clock cycle count of last PPS rising-edge
-<<<<<<< HEAD
     reg [63:0] write_en_clock_count;            // Clock cycle count of first sample in packet
 
     reg [63:0] packet_idx;                      // 64-bit counter for sent packets
     reg [63:0] sample_idx_offset;               // 64-bit offset for sample index
-=======
-    reg [63:0] write_en_clock_count;       // Clock cycle count of first sample in packet
->>>>>>> origin/master
 
     // State machine signals
     reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
@@ -261,10 +249,7 @@ module adc_to_udp_stream_v1_0 #
         end
     end
 
-<<<<<<< HEAD
     // Select the active write enable clock count
-=======
->>>>>>> origin/master
     always @(*) begin
         if (buffer_select)
             write_en_clock_count = fifo_0_write_en_clock_count;
@@ -272,14 +257,11 @@ module adc_to_udp_stream_v1_0 #
             write_en_clock_count = fifo_1_write_en_clock_count;
     end
 
-<<<<<<< HEAD
     // Update sample index
     always @(*) begin
         sample_idx = packet_idx * (PAYLOAD_WORDS / 2) + sample_idx_offset;
     end
 
-=======
->>>>>>> origin/master
     //////////////////////////////////////////////////////////////////////////
     // Ping-pong buffer for incoming ADC samples
     // Use block ram FIFO
@@ -481,13 +463,9 @@ module adc_to_udp_stream_v1_0 #
         udp_header[7][7:0] = 8'h00;   // 
 
         // Radio Header fields
-<<<<<<< HEAD
         packet_idx[63:0] = 64'd0;
         sample_idx[63:0] = 64'd0;
         sample_idx_offset[63:0] = 64'd0;
-=======
-        sample_idx[63:0] = 64'd0;
->>>>>>> origin/master
         sample_rate_numerator[63:0] = 64'd1228800000; // Default 1.2288Gsps
         sample_rate_denominator[63:0] = 64'd16; // Default 16x divisor
         frequency_idx[31:0] = 32'd0;
@@ -514,62 +492,62 @@ module adc_to_udp_stream_v1_0 #
     end
 
     // Assign Radio Header
-    assign radio_header[0] = sample_idx[7:0];
-    assign radio_header[1] = sample_idx[15:8];
-    assign radio_header[2] = sample_idx[23:16];
-    assign radio_header[3] = sample_idx[31:24];
-    assign radio_header[4] = sample_idx[39:32];
-    assign radio_header[5] = sample_idx[47:40];
-    assign radio_header[6] = sample_idx[55:48];
-    assign radio_header[7] = sample_idx[63:56];
-    assign radio_header[8] = sample_rate_numerator[7:0];
-    assign radio_header[9] = sample_rate_numerator[15:8];
-    assign radio_header[10] = sample_rate_numerator[23:16];
-    assign radio_header[11] = sample_rate_numerator[31:24];
-    assign radio_header[12] = sample_rate_numerator[39:32];
-    assign radio_header[13] = sample_rate_numerator[47:40];
-    assign radio_header[14] = sample_rate_numerator[55:48];
-    assign radio_header[15] = sample_rate_numerator[63:56];
-    assign radio_header[16] = sample_rate_denominator[7:0];
-    assign radio_header[17] = sample_rate_denominator[15:8];
-    assign radio_header[18] = sample_rate_denominator[23:16];
-    assign radio_header[19] = sample_rate_denominator[31:24];
-    assign radio_header[20] = sample_rate_denominator[39:32];
-    assign radio_header[21] = sample_rate_denominator[47:40];
-    assign radio_header[22] = sample_rate_denominator[55:48];
-    assign radio_header[23] = sample_rate_denominator[63:56];
-    assign radio_header[24] = frequency_idx[7:0];
-    assign radio_header[25] = frequency_idx[15:8];
-    assign radio_header[26] = frequency_idx[23:16]; 
-    assign radio_header[27] = frequency_idx[31:24];
-    assign radio_header[28] = num_subchannels[7:0];
-    assign radio_header[29] = num_subchannels[15:8];
-    assign radio_header[30] = num_subchannels[23:16];
-    assign radio_header[31] = num_subchannels[31:24];
-    assign radio_header[32] = pkt_samples[7:0];
-    assign radio_header[33] = pkt_samples[15:8];
-    assign radio_header[34] = pkt_samples[23:16];
-    assign radio_header[35] = pkt_samples[31:24];
-    assign radio_header[36] = bits_per_int[7:0];
-    assign radio_header[37] = bits_per_int[15:8];
+    assign radio_header[0] = sample_idx[63:56];
+    assign radio_header[1] = sample_idx[55:48];
+    assign radio_header[2] = sample_idx[47:40];
+    assign radio_header[3] = sample_idx[39:32];
+    assign radio_header[4] = sample_idx[31:24];
+    assign radio_header[5] = sample_idx[23:16];
+    assign radio_header[6] = sample_idx[15:8];
+    assign radio_header[7] = sample_idx[7:0];
+    assign radio_header[8] = sample_rate_numerator[63:56];
+    assign radio_header[9] = sample_rate_numerator[55:48];
+    assign radio_header[10] = sample_rate_numerator[47:40];
+    assign radio_header[11] = sample_rate_numerator[39:32];
+    assign radio_header[12] = sample_rate_numerator[31:24];
+    assign radio_header[13] = sample_rate_numerator[23:16];
+    assign radio_header[14] = sample_rate_numerator[15:8];
+    assign radio_header[15] = sample_rate_numerator[7:0];
+    assign radio_header[16] = sample_rate_denominator[63:56];
+    assign radio_header[17] = sample_rate_denominator[55:48];
+    assign radio_header[18] = sample_rate_denominator[47:40];
+    assign radio_header[19] = sample_rate_denominator[39:32];
+    assign radio_header[20] = sample_rate_denominator[31:24];
+    assign radio_header[21] = sample_rate_denominator[23:16];
+    assign radio_header[22] = sample_rate_denominator[15:8];
+    assign radio_header[23] = sample_rate_denominator[7:0];
+    assign radio_header[24] = frequency_idx[31:24];
+    assign radio_header[25] = frequency_idx[23:16];
+    assign radio_header[26] = frequency_idx[15:8];
+    assign radio_header[27] = frequency_idx[7:0];
+    assign radio_header[28] = num_subchannels[31:24];
+    assign radio_header[29] = num_subchannels[23:16];
+    assign radio_header[30] = num_subchannels[15:8];
+    assign radio_header[31] = num_subchannels[7:0];
+    assign radio_header[32] = pkt_samples[31:24];
+    assign radio_header[33] = pkt_samples[23:16];
+    assign radio_header[34] = pkt_samples[15:8];
+    assign radio_header[35] = pkt_samples[7:0];
+    assign radio_header[36] = bits_per_int[15:8];
+    assign radio_header[37] = bits_per_int[7:0];
     assign radio_header[38] = is_complex[7:0];
     assign radio_header[39] = 8'd0;
-    assign radio_header[40] = write_en_clock_count[7:0];
-    assign radio_header[41] = write_en_clock_count[15:8];
-    assign radio_header[42] = write_en_clock_count[23:16];
-    assign radio_header[43] = write_en_clock_count[31:24];
-    assign radio_header[44] = write_en_clock_count[39:32];
-    assign radio_header[45] = write_en_clock_count[47:40];
-    assign radio_header[46] = write_en_clock_count[55:48];
-    assign radio_header[47] = write_en_clock_count[63:56];
-    assign radio_header[48] = pps_clock_count[7:0];
-    assign radio_header[49] = pps_clock_count[15:8];
-    assign radio_header[50] = pps_clock_count[23:16];
-    assign radio_header[51] = pps_clock_count[31:24];
-    assign radio_header[52] = pps_clock_count[39:32];
-    assign radio_header[53] = pps_clock_count[47:40];
-    assign radio_header[54] = pps_clock_count[55:48];
-    assign radio_header[55] = pps_clock_count[63:56];
+    assign radio_header[40] = write_en_clock_count[63:56];
+    assign radio_header[41] = write_en_clock_count[55:48];
+    assign radio_header[42] = write_en_clock_count[47:40];
+    assign radio_header[43] = write_en_clock_count[39:32];
+    assign radio_header[44] = write_en_clock_count[31:24];
+    assign radio_header[45] = write_en_clock_count[23:16];
+    assign radio_header[46] = write_en_clock_count[15:8];
+    assign radio_header[47] = write_en_clock_count[7:0];
+    assign radio_header[48] = pps_clock_count[63:56];
+    assign radio_header[49] = pps_clock_count[55:48];
+    assign radio_header[50] = pps_clock_count[47:40];
+    assign radio_header[51] = pps_clock_count[39:32];
+    assign radio_header[52] = pps_clock_count[31:24];
+    assign radio_header[53] = pps_clock_count[23:16];
+    assign radio_header[54] = pps_clock_count[15:8];
+    assign radio_header[55] = pps_clock_count[7:0];
     assign radio_header[56] = 8'd0;
     assign radio_header[57] = 8'd0;
     assign radio_header[58] = 8'd0;
@@ -693,11 +671,7 @@ module adc_to_udp_stream_v1_0 #
     reg udp_packet_axis_valid;
     always @(posedge m00_axis_aclk) begin
         if (~m00_axis_aresetn || user_reset) begin
-<<<<<<< HEAD
             packet_idx <= 64'd0;
-=======
-            sample_idx <= 64'd0;
->>>>>>> origin/master
             packet_state <= 16'd0;
             fifo_0_read_en_latched <= 0;
             fifo_1_read_en_latched <= 0;
@@ -710,11 +684,7 @@ module adc_to_udp_stream_v1_0 #
                 // Reset state to start a new packet transmission
                 packet_state <= 16'd0;
                 start_udp_header <= 1'b1;
-<<<<<<< HEAD
                 packet_idx <= packet_idx + 1;       // Increment packets sent counter
-=======
-                sample_idx <= sample_idx + 1;       // Increment packets sent counter
->>>>>>> origin/master
             end else if (m00_axis_tready) begin
                 if (start_udp_header) begin
                     // Wait one cycle for packet to update
@@ -830,8 +800,9 @@ module adc_to_udp_stream_v1_0 #
             eth_dst_mac_lsb[1] = 8'h00;
             eth_dst_mac_lsb[2] = 8'h00;
             eth_dst_mac_lsb[3] = 8'h00;
-            sample_rate_numerator[63:0] = 64'd0;
-            sample_rate_denominator[63:0] = 64'd1;
+            sample_rate_numerator[63:0] = 64'd1228800000; // Default 1.2288Gsps
+            sample_rate_denominator[63:0] = 64'd16; // Default 16x divisor
+            frequency_idx[31:0] = 32'd0;
         end else if (s00_axi_awvalid && s00_axi_wvalid) begin
             case (s00_axi_awaddr)
                 32'h0000_0000: user_reset[31:0] <= s00_axi_wdata[31:0];
@@ -877,15 +848,12 @@ module adc_to_udp_stream_v1_0 #
                     udp_header[3][7:0] <= s00_axi_wdata[7:0];
                     udp_header[2][7:0] <= s00_axi_wdata[15:8];
                 end
-<<<<<<< HEAD
                 32'h0000_0024: begin 
                     sample_idx_offset[31:0] <= s00_axi_wdata[31:0];
                 end
                 32'h0000_0028: begin 
                     sample_idx_offset[63:32] <= s00_axi_wdata[31:0];
                 end
-=======
->>>>>>> origin/master
                 32'h0000_0030: begin 
                     sample_rate_numerator[31:0] <= s00_axi_wdata[31:0];
                 end
@@ -912,11 +880,7 @@ module adc_to_udp_stream_v1_0 #
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
                 32'h0000_0000: s00_axi_rdata = user_reset; 
-<<<<<<< HEAD
                 32'h0000_0004: s00_axi_rdata = frequency_idx;
-=======
-                32'h0000_0004: s00_axi_rdata = sample_idx[31:0];       
->>>>>>> origin/master
                 32'h0000_0008: s00_axi_rdata = received_counter;           
                 32'h0000_000C: begin
                     s00_axi_rdata = {eth_dst_mac[2], eth_dst_mac[3], eth_dst_mac[4], eth_dst_mac[5]};
@@ -940,13 +904,8 @@ module adc_to_udp_stream_v1_0 #
                     // Destination Port
                     s00_axi_rdata = {8'b0, 8'b0, udp_header[2], udp_header[3]};
                 end
-<<<<<<< HEAD
                 32'h0000_0024: s00_axi_rdata = sample_idx_offset[31:0];
                 32'h0000_0028: s00_axi_rdata = sample_idx_offset[63:32];
-=======
-                32'h0000_0024: s00_axi_rdata = full_buffer_counter;
-                32'h0000_0028: s00_axi_rdata = {16'b0, 5'b0, m00_axis_aresetn, m00_axis_tready, m00_axis_tvalid, 5'b0, s01_axis_aresetn, s01_axis_tready, s01_axis_tvalid};
->>>>>>> origin/master
                 32'h0000_0030: s00_axi_rdata = sample_rate_numerator[31:0];
                 32'h0000_0034: s00_axi_rdata = sample_rate_numerator[63:32];
                 32'h0000_0038: s00_axi_rdata = sample_rate_denominator[31:0];

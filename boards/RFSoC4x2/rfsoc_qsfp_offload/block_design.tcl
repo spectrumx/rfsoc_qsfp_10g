@@ -359,8 +359,8 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.ARB_ALGORITHM {3} \
    CONFIG.ARB_ON_MAX_XFERS {0} \
-   CONFIG.ARB_ON_TLAST {1} \
    CONFIG.HAS_TLAST {1} \
+   CONFIG.ARB_ON_TLAST {1} \
    CONFIG.ROUTING_MODE {0} \
  ] $axis_switch_0
 
