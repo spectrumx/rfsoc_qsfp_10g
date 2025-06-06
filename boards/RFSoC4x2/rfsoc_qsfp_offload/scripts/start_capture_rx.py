@@ -34,6 +34,7 @@ def main(args):
     ADC_TILE = 2       # ADC Tile 226
     ADC_SAMPLE_FREQUENCY = 1024  # MSps
     ADC_PLL_FREQUENCY    = 491.52   # MHz
+    ADC_DECIMATION = 16 # Default, not actively set
     ADC_FC = -1*f_c # FM Band
 
     pll_freq = ADC_PLL_FREQUENCY
@@ -68,11 +69,28 @@ def main(args):
     ol.adc_to_udp_stream_A.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
     ol.adc_to_udp_stream_B.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
 
+    # Set center frequency
+    ol.adc_to_udp_stream_A.register_map.FREQUENCY_IDX =  f_c * 1e6
+    ol.adc_to_udp_stream_B.register_map.FREQUENCY_IDX =  f_c * 1e6
+
     print(f"Starting UDP stream on: {args.channels}")
+
+    # Set starting sample
+    start_time = time.time()
+    samples_since_epoch = int(start_time * ((ADC_SAMPLE_FREQUENCY * 1e6) / ADC_DECIMATION))
+    samples_since_epoch_lsb = samples_since_epoch & 0xFFFFFFFF
+    samples_since_epoch_msb = samples_since_epoch >> 32
+    ol.adc_to_udp_stream_A.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
+    ol.adc_to_udp_stream_A.register_map.SAMPLE_IDX_OFFSET_MSB = samples_since_epoch_msb
+    ol.adc_to_udp_stream_B.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
+    ol.adc_to_udp_stream_B.register_map.SAMPLE_IDX_OFFSET_MSB = samples_since_epoch_msb
+
     if 'A' in args.channels:
         ol.adc_to_udp_stream_A.register_map.USER_RESET = 0
     if 'B' in args.channels:
         ol.adc_to_udp_stream_B.register_map.USER_RESET = 0
+    
+    print(f"Start time: {start_time} sample offset: {samples_since_epoch}")
 
     print("Ctrl-C to exit")
     while(not exit_flag):
