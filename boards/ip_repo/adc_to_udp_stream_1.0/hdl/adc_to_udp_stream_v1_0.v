@@ -31,7 +31,7 @@ module adc_to_udp_stream_v1_0 #
 (
     // Parameters of Axi Slave Bus Interface S00_AXI
     parameter integer C_S00_AXI_DATA_WIDTH	= 32,
-    parameter integer C_S00_AXI_ADDR_WIDTH	= 6,
+    parameter integer C_S00_AXI_ADDR_WIDTH	= 7,
 
     // Parameters of Input AXIS Slave Bus Interface S01_AXIS
     parameter integer C_S01_AXIS_TDATA_WIDTH = 64, 
@@ -168,6 +168,9 @@ module adc_to_udp_stream_v1_0 #
     reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
     wire start_payload;
     wire in_payload;
+    reg [31:0] pps_count;                       // Count PPS rising edges
+    reg enable_next_pps_reset;                  // PPS Comp clock domain
+    reg enable_next_pps_s00;                    // S00 clock domain
 
     // AXI bus signals
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet_axis_data;           
@@ -176,7 +179,7 @@ module adc_to_udp_stream_v1_0 #
     // Timer to trigger packet transmission every 100ms
     reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
     reg [31:0] full_buffer_counter;             // 32-bit counter for full buffers
-    reg [31:0] user_reset;                       // State of user reset
+    reg user_reset;                            // State of user enable
 
     // FIFO
     wire fifo_0_full;
@@ -206,6 +209,8 @@ module adc_to_udp_stream_v1_0 #
     reg fifo_0_empty_latched;
     reg fifo_1_empty_latched;
 
+    wire capture_enable;
+
     // Clock counter
     wire [63:0] adc_clk_count;
     reg [63:0] fifo_0_write_en_clock_count;
@@ -225,11 +230,24 @@ module adc_to_udp_stream_v1_0 #
     );
 
     // Capture adc_clk_count when pps_comp transitions high
-    always @(posedge pps_comp or negedge s01_axis_aresetn) begin
-        if (!s01_axis_aresetn) begin
+    always @(posedge pps_comp or posedge user_reset) begin
+        if (user_reset && !enable_next_pps_s00) begin
+            pps_count <= 32'h0;
             pps_clock_count <= 64'h0;
+            enable_next_pps_reset <= 1'b0;
         end else begin
+            // Increment pps counters
             pps_clock_count <= adc_clk_count; // Capture on rising edge
+            pps_count <= pps_count + 1;
+
+            // Sync enable next pps signal
+            if(enable_next_pps_s00 && !enable_next_pps_reset) begin
+                enable_next_pps_reset = 1'b1;
+            end
+
+            if(!enable_next_pps_s00 && enable_next_pps_reset) begin
+                enable_next_pps_reset <= 1'b0;
+            end
         end
     end
 
@@ -268,7 +286,7 @@ module adc_to_udp_stream_v1_0 #
     // Use block ram FIFO
     //////////////////////////////////////////////////////////////////////////
     always @(posedge s01_axis_aclk or negedge s01_axis_aresetn) begin
-        if (!s01_axis_aresetn) begin
+        if (!s01_axis_aresetn || user_reset) begin
             received_counter <= 0;
             fifo_0_rst_busy_latched <= 0;
             fifo_1_rst_busy_latched <= 0;
@@ -308,8 +326,10 @@ module adc_to_udp_stream_v1_0 #
     assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
     assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
     assign buffer_select = fifo_0_full | fifo_0_full_reg;
-    assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_0_rst_combined && !buffer_select;
-    assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && !user_reset && !fifo_1_rst_combined && buffer_select;
+
+    assign capture_enable = !user_reset || enable_next_pps_reset; 
+    assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && capture_enable && !fifo_0_rst_combined && !buffer_select;
+    assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && capture_enable && !fifo_1_rst_combined && buffer_select;
 
     // Flag fifo full transition for a single cycle
     always @(posedge m00_axis_aclk) begin
@@ -489,7 +509,13 @@ module adc_to_udp_stream_v1_0 #
 
     // Initialize state
     initial begin
-        user_reset = 32'h1;
+        user_reset = 1'b1;
+        enable_next_pps_reset = 1'b0;
+        enable_next_pps_s00 = 1'b0;
+        pps_count = 32'h0;
+
+        fifo_0_empty_latched = 1'b0;
+        fifo_1_empty_latched = 1'b0;
     end
 
     // Assign Radio Header
@@ -768,7 +794,7 @@ module adc_to_udp_stream_v1_0 #
     end
 
     // AXI4-Stream control signals
-    assign m00_axis_tvalid = udp_packet_axis_valid && (user_reset == 32'h0);     // Valid when we're in the middle of sending the packet
+    assign m00_axis_tvalid = udp_packet_axis_valid && capture_enable;     // Valid when we're in the middle of sending the packet
     assign m00_axis_tdata = m00_axis_tvalid ? udp_packet_axis_data : 64'h0;               // Transmit each 64-bit word of the UDP packet
     assign m00_axis_tuser = 1'b0;
     assign m00_axis_tlast = (packet_state == FINAL_STATE + 1) && m00_axis_tvalid; // Mark the last word of the packet
@@ -805,8 +831,12 @@ module adc_to_udp_stream_v1_0 #
             sample_rate_denominator[63:0] = 64'd16; // Default 16x divisor
             frequency_idx[31:0] = 32'd0;
         end else if (s00_axi_awvalid && s00_axi_wvalid) begin
+            // Handle AXI write logic
             case (s00_axi_awaddr)
-                32'h0000_0000: user_reset[31:0] <= s00_axi_wdata[31:0];
+                32'h0000_0000: begin 
+                    user_reset <= s00_axi_wdata[0];
+                    enable_next_pps_s00 <= s00_axi_wdata[1];
+                end
                 32'h0000_0004: frequency_idx[31:0] <= s00_axi_wdata[31:0];
                 32'h0000_000C: begin
                     // Dest MAC LSB
@@ -871,6 +901,12 @@ module adc_to_udp_stream_v1_0 #
                     // Do nothing
                 end
             endcase
+        end 
+
+        // Set user reset after enable_next_pps_reset is triggered
+        if (enable_next_pps_reset && enable_next_pps_s00) begin
+            user_reset <= 1'b0;
+            enable_next_pps_s00 = 1'b0;
         end
     end
 
@@ -880,7 +916,7 @@ module adc_to_udp_stream_v1_0 #
             s00_axi_rdata <= 32'b0;
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
-                32'h0000_0000: s00_axi_rdata = user_reset; 
+                32'h0000_0000: s00_axi_rdata = {30'h0, enable_next_pps_s00, user_reset}; 
                 32'h0000_0004: s00_axi_rdata = frequency_idx;
                 32'h0000_0008: s00_axi_rdata = received_counter;           
                 32'h0000_000C: begin
@@ -907,6 +943,7 @@ module adc_to_udp_stream_v1_0 #
                 end
                 32'h0000_0024: s00_axi_rdata = sample_idx_offset[31:0];
                 32'h0000_0028: s00_axi_rdata = sample_idx_offset[63:32];
+                32'h0000_002C: s00_axi_rdata = pps_count[31:0];
                 32'h0000_0030: s00_axi_rdata = sample_rate_numerator[31:0];
                 32'h0000_0034: s00_axi_rdata = sample_rate_numerator[63:32];
                 32'h0000_0038: s00_axi_rdata = sample_rate_denominator[31:0];
