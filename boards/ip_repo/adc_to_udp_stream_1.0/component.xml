@@ -407,28 +407,6 @@
       </spirit:portMaps>
     </spirit:busInterface>
     <spirit:busInterface>
-      <spirit:name>adc_clk</spirit:name>
-      <spirit:busType spirit:vendor="xilinx.com" spirit:library="signal" spirit:name="clock" spirit:version="1.0"/>
-      <spirit:abstractionType spirit:vendor="xilinx.com" spirit:library="signal" spirit:name="clock_rtl" spirit:version="1.0"/>
-      <spirit:monitor spirit:interfaceMode="slave"/>
-      <spirit:portMaps>
-        <spirit:portMap>
-          <spirit:logicalPort>
-            <spirit:name>CLK</spirit:name>
-          </spirit:logicalPort>
-          <spirit:physicalPort>
-            <spirit:name>adc_clk</spirit:name>
-          </spirit:physicalPort>
-        </spirit:portMap>
-      </spirit:portMaps>
-      <spirit:parameters>
-        <spirit:parameter>
-          <spirit:name>FREQ_HZ</spirit:name>
-          <spirit:value spirit:id="BUSIFPARAM_VALUE.ADC_CLK.FREQ_HZ"/>
-        </spirit:parameter>
-      </spirit:parameters>
-    </spirit:busInterface>
-    <spirit:busInterface>
       <spirit:name>pps_comp</spirit:name>
       <spirit:busType spirit:vendor="xilinx.com" spirit:library="signal" spirit:name="clock" spirit:version="1.0"/>
       <spirit:abstractionType spirit:vendor="xilinx.com" spirit:library="signal" spirit:name="clock_rtl" spirit:version="1.0"/>
@@ -462,15 +440,6 @@
         <spirit:width spirit:format="long" spirit:resolve="dependent" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.C_S00_AXI_DATA_WIDTH&apos;)) - 1) + 1">32</spirit:width>
         <spirit:usage>register</spirit:usage>
         <spirit:access>read-write</spirit:access>
-        <spirit:register>
-          <spirit:name>USER_RESET</spirit:name>
-          <spirit:displayName>USER_RESET</spirit:displayName>
-          <spirit:description>User Reset</spirit:description>
-          <spirit:addressOffset>0</spirit:addressOffset>
-          <spirit:size spirit:format="bitString">32</spirit:size>
-          <spirit:volatile>true</spirit:volatile>
-          <spirit:access>read-write</spirit:access>
-        </spirit:register>
         <spirit:register>
           <spirit:name>FREQUENCY_IDX</spirit:name>
           <spirit:displayName>FREQUENCY_IDX</spirit:displayName>
@@ -586,36 +555,25 @@
           <spirit:access>read-write</spirit:access>
         </spirit:register>
         <spirit:register>
-          <spirit:name>SAMPLE_RATE_NUMERATOR_LSB</spirit:name>
-          <spirit:displayName>SAMPLE_RATE_NUMERATOR_LSB</spirit:displayName>
-          <spirit:description>Sample rate numerator</spirit:description>
-          <spirit:addressOffset>48</spirit:addressOffset>
+          <spirit:name>PPS_COUNTER</spirit:name>
+          <spirit:displayName>PPS_COUNTER</spirit:displayName>
+          <spirit:description>PPS Counter</spirit:description>
+          <spirit:addressOffset>44</spirit:addressOffset>
           <spirit:size spirit:format="long">32</spirit:size>
+          <spirit:volatile>true</spirit:volatile>
           <spirit:access>read-write</spirit:access>
         </spirit:register>
         <spirit:register>
-          <spirit:name>SAMPLE_RATE_NUMERATOR_MSB</spirit:name>
-          <spirit:displayName>SAMPLE_RATE_NUMERATOR_MSB</spirit:displayName>
-          <spirit:description>Sample rate numerator</spirit:description>
-          <spirit:addressOffset>52</spirit:addressOffset>
+          <spirit:name>CTRL</spirit:name>
+          <spirit:displayName>CTRL</spirit:displayName>
+          <spirit:description>Control register</spirit:description>
+          <spirit:addressOffset>0</spirit:addressOffset>
           <spirit:size spirit:format="long">32</spirit:size>
+          <spirit:volatile>true</spirit:volatile>
           <spirit:access>read-write</spirit:access>
-        </spirit:register>
-        <spirit:register>
-          <spirit:name>SAMPLE_RATE_DENOMINATOR_LSB</spirit:name>
-          <spirit:displayName>SAMPLE_RATE_DENOMINATOR_LSB</spirit:displayName>
-          <spirit:description>Sample rate denominator</spirit:description>
-          <spirit:addressOffset>56</spirit:addressOffset>
-          <spirit:size spirit:format="long">32</spirit:size>
-          <spirit:access>read-write</spirit:access>
-        </spirit:register>
-        <spirit:register>
-          <spirit:name>SAMPLE_RATE_DENOMINATOR_MSB</spirit:name>
-          <spirit:displayName>SAMPLE_RATE_DENOMINATOR_MSB</spirit:displayName>
-          <spirit:description>Sample rate denominator</spirit:description>
-          <spirit:addressOffset>60</spirit:addressOffset>
-          <spirit:size spirit:format="long">32</spirit:size>
-          <spirit:access>read-write</spirit:access>
+          <spirit:reset>
+            <spirit:value spirit:format="long">0</spirit:value>
+          </spirit:reset>
         </spirit:register>
       </spirit:addressBlock>
     </spirit:memoryMap>
@@ -634,7 +592,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>9095f14b</spirit:value>
+            <spirit:value>72537f24</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -650,7 +608,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>9095f14b</spirit:value>
+            <spirit:value>72537f24</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -729,7 +687,7 @@
         <spirit:wire>
           <spirit:direction>in</spirit:direction>
           <spirit:vector>
-            <spirit:left spirit:format="long" spirit:resolve="dependent" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.C_S00_AXI_ADDR_WIDTH&apos;)) - 1)">5</spirit:left>
+            <spirit:left spirit:format="long" spirit:resolve="dependent" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.C_S00_AXI_ADDR_WIDTH&apos;)) - 1)">6</spirit:left>
             <spirit:right spirit:format="long">0</spirit:right>
           </spirit:vector>
           <spirit:wireTypeDefs>
@@ -892,7 +850,7 @@
         <spirit:wire>
           <spirit:direction>in</spirit:direction>
           <spirit:vector>
-            <spirit:left spirit:format="long" spirit:resolve="dependent" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.C_S00_AXI_ADDR_WIDTH&apos;)) - 1)">5</spirit:left>
+            <spirit:left spirit:format="long" spirit:resolve="dependent" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.C_S00_AXI_ADDR_WIDTH&apos;)) - 1)">6</spirit:left>
             <spirit:right spirit:format="long">0</spirit:right>
           </spirit:vector>
           <spirit:wireTypeDefs>
@@ -1193,19 +1151,6 @@
         </spirit:wire>
       </spirit:port>
       <spirit:port>
-        <spirit:name>adc_clk</spirit:name>
-        <spirit:wire>
-          <spirit:direction>in</spirit:direction>
-          <spirit:wireTypeDefs>
-            <spirit:wireTypeDef>
-              <spirit:typeName>wire</spirit:typeName>
-              <spirit:viewNameRef>xilinx_verilogsynthesis</spirit:viewNameRef>
-              <spirit:viewNameRef>xilinx_verilogbehavioralsimulation</spirit:viewNameRef>
-            </spirit:wireTypeDef>
-          </spirit:wireTypeDefs>
-        </spirit:wire>
-      </spirit:port>
-      <spirit:port>
         <spirit:name>pps_comp</spirit:name>
         <spirit:wire>
           <spirit:direction>in</spirit:direction>
@@ -1230,7 +1175,7 @@
         <spirit:name>C_S00_AXI_ADDR_WIDTH</spirit:name>
         <spirit:displayName>C S00 AXI ADDR WIDTH</spirit:displayName>
         <spirit:description>Width of S_AXI address bus</spirit:description>
-        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.C_S00_AXI_ADDR_WIDTH" spirit:order="4" spirit:rangeType="long">6</spirit:value>
+        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.C_S00_AXI_ADDR_WIDTH" spirit:order="4" spirit:rangeType="long">7</spirit:value>
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="integer">
         <spirit:name>C_S01_AXIS_TDATA_WIDTH</spirit:name>
@@ -1274,23 +1219,39 @@
     <spirit:fileSet>
       <spirit:name>xilinx_verilogsynthesis_view_fileset</spirit:name>
       <spirit:file>
+        <spirit:name>hdl/reset_clock_sync.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+      </spirit:file>
+      <spirit:file>
         <spirit:name>hdl/rising_edge_counter.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/adc_to_udp_stream_v1_0.v</spirit:name>
+        <spirit:name>hdl/signal_clock_sync.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
-        <spirit:userFileType>CHECKSUM_372c977e</spirit:userFileType>
+      </spirit:file>
+      <spirit:file>
+        <spirit:name>hdl/adc_to_udp_stream_v1_9.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+        <spirit:userFileType>CHECKSUM_894773c5</spirit:userFileType>
       </spirit:file>
     </spirit:fileSet>
     <spirit:fileSet>
       <spirit:name>xilinx_verilogbehavioralsimulation_view_fileset</spirit:name>
       <spirit:file>
+        <spirit:name>hdl/reset_clock_sync.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+      </spirit:file>
+      <spirit:file>
         <spirit:name>hdl/rising_edge_counter.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/adc_to_udp_stream_v1_0.v</spirit:name>
+        <spirit:name>hdl/signal_clock_sync.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+      </spirit:file>
+      <spirit:file>
+        <spirit:name>hdl/adc_to_udp_stream_v1_9.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
     </spirit:fileSet>
@@ -1362,7 +1323,7 @@
       <spirit:name>C_S00_AXI_ADDR_WIDTH</spirit:name>
       <spirit:displayName>C S00 AXI ADDR WIDTH</spirit:displayName>
       <spirit:description>Width of S_AXI address bus</spirit:description>
-      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.C_S00_AXI_ADDR_WIDTH" spirit:order="4" spirit:minimum="0" spirit:maximum="6" spirit:rangeType="long">6</spirit:value>
+      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.C_S00_AXI_ADDR_WIDTH" spirit:order="4" spirit:minimum="7" spirit:maximum="7" spirit:rangeType="long">7</spirit:value>
       <spirit:vendorExtensions>
         <xilinx:parameterInfo>
           <xilinx:enablement>
@@ -1432,8 +1393,8 @@
       <xilinx:xpmLibraries>
         <xilinx:xpmLibrary>XPM_FIFO</xilinx:xpmLibrary>
       </xilinx:xpmLibraries>
-      <xilinx:coreRevision>41</xilinx:coreRevision>
-      <xilinx:coreCreationDateTime>2025-06-05T12:41:22Z</xilinx:coreCreationDateTime>
+      <xilinx:coreRevision>52</xilinx:coreRevision>
+      <xilinx:coreCreationDateTime>2025-06-22T13:56:55Z</xilinx:coreCreationDateTime>
       <xilinx:tags>
         <xilinx:tag xilinx:name="ui.data.coregen.df@8fd3839_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
         <xilinx:tag xilinx:name="ui.data.coregen.df@6868a9e1_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
@@ -2083,16 +2044,125 @@
         <xilinx:tag xilinx:name="ui.data.coregen.df@90c782a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
         <xilinx:tag xilinx:name="ui.data.coregen.df@4b07299c_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
         <xilinx:tag xilinx:name="ui.data.coregen.df@5dd6e087_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@1b291173_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@28af3bef_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@2ef61413_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@4c368b59_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7e80af65_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7afb42f3_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@71173d27_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@5419176f_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3bde0acb_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@2f5c73a7_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@164eab77_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3e60cee9_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@11712a80_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@679c801d_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7eece0b4_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@e8e45ad_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@1933130b_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@6fd946cf_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@50bb29b6_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@10e33195_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@27ba545a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@8a19978_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@5893353a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@4ea79711_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@675b138d_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@63f5b286_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@5ef3b26c_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@18cdb088_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@5cf64cca_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@54e57cdc_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@73cf865f_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@4c8dc536_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@50122198_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@521ad4fc_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7058c846_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@565348fc_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@771f6350_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@6e9795b4_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@69fc5b27_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@26c4b310_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@b260e41_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@fac870d_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@33b061bf_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3e8965b8_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@4b18562c_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@509d0232_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@36dd2602_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@313ef269_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@62c09c6a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@4a5f3865_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@60c70ea4_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7ff28e52_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@35ef6699_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@580159c2_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7f46b319_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@5359537e_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@383b8660_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@408f9339_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7c5a41f2_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3d5498b4_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3a8ace74_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@2cedf72_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@36d0500d_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@25d6925d_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@57b13b40_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@18bd82f1_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@77ff7b0f_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@206d750f_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@879a93_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@4a071324_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@14410895_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@195b70fb_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@1e63f86a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@2ce49d1_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@52b8050b_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@34ba846a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@256ce8eb_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3c40f99b_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@556b447a_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3b8d9172_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@277944bb_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@6ddc123f_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@db15789_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3e7bd935_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@39d0a3a0_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@404200b6_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@204944bb_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3897c6ca_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7999cf5c_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@7803d3f4_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@9cdf76b_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@68f42af1_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@15bd2d64_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@25936550_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@6ed64e88_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@12808b04_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@5ec240d0_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@49235f73_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3a7e115e_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@76633067_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@ff31809_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@2e0a326b_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@89a52b1_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@6015529_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3d8c0d7d_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@719978f3_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@3c3dddc0_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@10cc98bd_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
+        <xilinx:tag xilinx:name="ui.data.coregen.df@19b76d2e_ARCHIVE_LOCATION">/home/nrainvil/git/rfsoc_qsfp_10g/boards/ip_repo/adc_to_udp_stream_1.0</xilinx:tag>
       </xilinx:tags>
     </xilinx:coreExtensions>
     <xilinx:packagingInfo>
-      <xilinx:xilinxVersion>2021.1</xilinx:xilinxVersion>
-      <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="e0058f96"/>
-      <xilinx:checksum xilinx:scope="memoryMaps" xilinx:value="0c128f9d"/>
-      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="98d85cbc"/>
-      <xilinx:checksum xilinx:scope="ports" xilinx:value="baafbce8"/>
-      <xilinx:checksum xilinx:scope="hdlParameters" xilinx:value="bf308065"/>
-      <xilinx:checksum xilinx:scope="parameters" xilinx:value="c59abd76"/>
+      <xilinx:xilinxVersion>2022.1</xilinx:xilinxVersion>
+      <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="23118f13"/>
+      <xilinx:checksum xilinx:scope="memoryMaps" xilinx:value="1dcd87c4"/>
+      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="0f477a2e"/>
+      <xilinx:checksum xilinx:scope="ports" xilinx:value="3e827ffe"/>
+      <xilinx:checksum xilinx:scope="hdlParameters" xilinx:value="bc18b65a"/>
+      <xilinx:checksum xilinx:scope="parameters" xilinx:value="62ee2465"/>
     </xilinx:packagingInfo>
   </spirit:vendorExtensions>
 </spirit:component>

@@ -85,19 +85,15 @@ module adc_to_udp_stream_v1_0 #
     input wire m00_axis_tready,
 
     // ADC Clock
-    input wire adc_clk,
     input wire pps_comp
 );
 
     // Local params
     localparam integer RADIO_HEADER_BYTES = 64;
     localparam integer PAYLOAD_WORDS = 4096;                                // Payload length (in 16-bit words)
-    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2) + RADIO_HEADER_BYTES; // 8 bytes (UDP header) + 2 bytes/word * payload_length
+    localparam integer UDP_HEADER_LENGTH = 8 + (PAYLOAD_WORDS * 2) + RADIO_HEADER_BYTES; 
     localparam integer IP_HEADER_LENGTH  = 20 + UDP_HEADER_LENGTH;          // 20 bytes (IP header) + UDP length
     localparam integer TOTAL_HEADER_LENGTH = 14 + IP_HEADER_LENGTH;         // 14 bytes (Ethernet header) + IP length
-
-    localparam integer FIFO_LENGTH = 2048;                                  // Longer than required length (power of 2)
-    localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
 
     localparam integer HEADER_STATE = (RADIO_HEADER_BYTES / 8) + 6;         // States to tx (words + headers)
     localparam integer FINAL_STATE = (PAYLOAD_WORDS / 4) + HEADER_STATE;    // States to tx (words + headers)
@@ -105,26 +101,16 @@ module adc_to_udp_stream_v1_0 #
     localparam integer WORDS_PER_AXIS = C_S01_AXIS_TDATA_WIDTH / 16;        // 16-bit words
     localparam integer AXIS_PER_BUFFER = PAYLOAD_WORDS / WORDS_PER_AXIS;    // Ping-pong buffer size
 
+    localparam integer FIFO_LENGTH = 2048;                                  // Longer than required length (power of 2)
+    localparam integer FIFO_BUFFER = FIFO_LENGTH - (PAYLOAD_WORDS/4);
     localparam integer FIFO_READ_DELAY = 2;
 
     // Ping-pong buffer 
-    wire buffer_select;
-
-    wire fifo_0_write_en;
-    wire fifo_1_write_en;
+    wire buffer_select_s01;
+    wire fifo_0_write_en_s01;
+    wire fifo_1_write_en_s01;
     wire fifo_0_read_en;
     wire fifo_1_read_en;
-    wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_0_out_data;
-    wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_1_out_data;
-
-    wire [11:0] fifo_0_wr_count;
-    wire [11:0] fifo_1_wr_count;
-    wire [11:0] fifo_0_rd_count;
-    wire [11:0] fifo_1_rd_count;
-    wire fifo_0_wr_rst_busy;
-    wire fifo_0_rd_rst_busy;
-    wire fifo_1_wr_rst_busy;
-    wire fifo_1_rd_rst_busy;
 
     // Define the UDP packet 
     reg [7:0] udp_packet_int[0:41];             // Ethernet frame, IP header, UDP header
@@ -145,7 +131,7 @@ module adc_to_udp_stream_v1_0 #
     reg [7:0] eth_dst_mac_lsb[3:0];             // Temp storage for Destination MAC LSB
     reg start_udp_header;
     reg in_udp_header;
-    wire update_packet;
+    wire update_packet_s01;
 
     // Radio packet header
     wire [7:0] radio_header[RADIO_HEADER_BYTES-1:0];     // Radio packet header (see comment at top of file) 
@@ -168,112 +154,135 @@ module adc_to_udp_stream_v1_0 #
     reg [15:0] packet_state;                    // Current state/index (0 to 5 to traverse the packet header)
     wire start_payload;
     wire in_payload;
-    reg [31:0] pps_count;                       // Count PPS rising edges
-    reg enable_next_pps_reset;                  // PPS Comp clock domain
-    reg enable_next_pps_s00;                    // S00 clock domain
 
     // AXI bus signals
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] udp_packet_axis_data;           
     reg [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_out_data_prev;           
 
     // Timer to trigger packet transmission every 100ms
-    reg [31:0] received_counter;                // 32-bit counter for received AXIS transactions
+    reg [31:0] received_counter_s01;                // 32-bit counter for received AXIS transactions
     reg [31:0] full_buffer_counter;             // 32-bit counter for full buffers
-    reg user_reset;                            // State of user enable
 
-    // FIFO
-    wire fifo_0_full;
-    wire fifo_1_full;
-    wire fifo_0_empty;
-    wire fifo_1_empty;
-    reg fifo_0_reset;
-    reg fifo_1_reset;
-    wire fifo_0_rst_busy;
-    wire fifo_1_rst_busy;
+    //////////////////////////////////////////////////////////////////////////
+    // Sync user_reset to all clock domains
+    //////////////////////////////////////////////////////////////////////////
 
-    reg fifo_0_full_reg;
-    reg fifo_1_full_reg;
-    reg fifo_0_full_delay;
-    reg fifo_1_full_delay;
-    wire fifo_0_full_trigger;
-    wire fifo_1_full_trigger;
-    reg fifo_0_read_en_latched;
-    reg fifo_1_read_en_latched;
+    reg user_reset_s00;                            // User reset
+    wire user_reset_s01;
+    wire user_reset_m00;
 
-    reg fifo_0_rst_busy_latched;
-    reg fifo_1_rst_busy_latched;
+    initial begin
+        user_reset_s00 = 1'b1;
+    end
 
-    wire fifo_0_rst_combined;
-    wire fifo_1_rst_combined;
+    // Two stage reset sync for S01 clock domain
+    reset_clock_sync user_reset_s01_sync (
+        .clk1_in(s01_axis_aclk),
+        .reset_clk0(user_reset_s00),
+        .reset_clk1(user_reset_s01)
+    );
 
-    reg fifo_0_empty_latched;
-    reg fifo_1_empty_latched;
-
-    wire capture_enable;
-
-    // Clock counter
-    wire [63:0] adc_clk_count;
-    reg [63:0] fifo_0_write_en_clock_count;
-    reg [63:0] fifo_1_write_en_clock_count;
+    // Two stage reset sync for M00 clock domain
+    reset_clock_sync user_reset_m00_sync (
+        .clk1_in(m00_axis_aclk),
+        .reset_clk0(user_reset_s00),
+        .reset_clk1(user_reset_m00)
+    );
 
     //////////////////////////////////////////////////////////////////////////
     // Count rising edges of ADC clock when PPS goes high
     //////////////////////////////////////////////////////////////////////////
 
+    wire [63:0] adc_clk_count;
+    reg [31:0] pps_count;                       // Count PPS rising edges
+    reg pps_detect_s01;                  // S01
+    reg enable_next_pps_s00;                    // S00 clock domain
+    wire enable_next_pps_s01;                   // S01 clock domain
+    reg [1:0] sync_enable_next_pps_s01;
+    reg pps_comp_s01;
+    reg [63:0] fifo_0_write_en_s01_clock_count;
+    reg [63:0] fifo_1_write_en_s01_clock_count;
+
+    initial begin
+        pps_count = 32'h0;
+        pps_detect_s01 = 1'b0;
+        enable_next_pps_s00 = 1'b0;
+        pps_comp_s01 = 1'b0;
+        fifo_0_write_en_s01_clock_count = 64'b0;
+        fifo_1_write_en_s01_clock_count = 64'b0;
+    end
+
+    // Sync enable next PPS request from S00 bus
+    reset_clock_sync enable_next_pps_sync (
+        .clk1_in(s01_axis_aclk),
+        .reset_clk0(enable_next_pps_s00),
+        .reset_clk1(enable_next_pps_s01)
+    );
+
     // ADC clock counter
     rising_edge_counter #(
         .COUNTER_WIDTH(64)
     ) adc_clk_counter_inst (
-        .clk_in(adc_clk),
+        .clk_in(s01_axis_aclk),
         .resetn(s01_axis_aresetn),
         .edge_count(adc_clk_count)
     );
 
-    // Capture adc_clk_count when pps_comp transitions high
-    always @(posedge pps_comp or posedge user_reset) begin
-        if (user_reset && !enable_next_pps_s00) begin
+    // PPS counter and PPS clock cycle counter
+    always @(posedge s01_axis_aclk or negedge s01_axis_aresetn) begin
+        if(!s01_axis_aresetn) begin
+            pps_comp_s01 = 1'b0;
             pps_count <= 32'h0;
             pps_clock_count <= 64'h0;
-            enable_next_pps_reset <= 1'b0;
+            pps_detect_s01 <= 1'b0;
         end else begin
-            // Increment pps counters
-            pps_clock_count <= adc_clk_count; // Capture on rising edge
-            pps_count <= pps_count + 1;
+            // Reset PPS on user reset if enable next pps is not set
+            if (user_reset_s01 && !enable_next_pps_s01) begin
+                pps_count <= 32'h0;
+                pps_clock_count <= 64'h0;
+                pps_detect_s01 <= 1'b0;
+            // Reset PPS detect if enable_next_pps is disabled
+            end else if (pps_detect_s01 && !enable_next_pps_s01) begin
+                pps_detect_s01 <= 1'b0;
+            // Check for rising edge of PPS
+            end else if (pps_comp && !pps_comp_s01) begin
+                pps_count <= pps_count + 1;
+                pps_clock_count <= adc_clk_count;
 
-            // Sync enable next pps signal
-            if(enable_next_pps_s00 && !enable_next_pps_reset) begin
-                enable_next_pps_reset = 1'b1;
+                // Sync enable next pps signal
+                if(!pps_detect_s01 && enable_next_pps_s01) begin
+                    pps_detect_s01 <= 1'b1;
+                end
             end
 
-            if(!enable_next_pps_s00 && enable_next_pps_reset) begin
-                enable_next_pps_reset <= 1'b0;
-            end
+            // Sync PPS to ADC clock
+            pps_comp_s01 <= pps_comp;
         end
     end
 
     // Capture adc_clk_count when write select transitions high 
-    always @(posedge fifo_0_write_en or negedge s01_axis_aresetn) begin
+    always @(posedge fifo_0_write_en_s01 or negedge s01_axis_aresetn) begin
         if (!s01_axis_aresetn) begin
-            fifo_0_write_en_clock_count <= 64'h0;
+            fifo_0_write_en_s01_clock_count <= 64'h0;
         end else begin
-            fifo_0_write_en_clock_count <= adc_clk_count; // Capture on rising edge 
+            fifo_0_write_en_s01_clock_count <= adc_clk_count; // Capture on rising edge 
         end
     end
 
-    always @(posedge fifo_1_write_en or negedge s01_axis_aresetn) begin
+    always @(posedge fifo_1_write_en_s01 or negedge s01_axis_aresetn) begin
         if (!s01_axis_aresetn) begin
-            fifo_1_write_en_clock_count <= 64'h0;
+            fifo_1_write_en_s01_clock_count <= 64'h0;
         end else begin
-            fifo_1_write_en_clock_count <= adc_clk_count; // Capture on rising edge 
+            fifo_1_write_en_s01_clock_count <= adc_clk_count; // Capture on rising edge 
         end
     end
 
     // Select the active write enable clock count
     always @(*) begin
-        if (buffer_select)
-            write_en_clock_count = fifo_0_write_en_clock_count;
+        if (buffer_select_s01)
+            write_en_clock_count = fifo_0_write_en_s01_clock_count;
         else
-            write_en_clock_count = fifo_1_write_en_clock_count;
+            write_en_clock_count = fifo_1_write_en_s01_clock_count;
     end
 
     // Update sample index
@@ -285,23 +294,66 @@ module adc_to_udp_stream_v1_0 #
     // Ping-pong buffer for incoming ADC samples
     // Use block ram FIFO
     //////////////////////////////////////////////////////////////////////////
+
+    // FIFO
+    reg fifo_0_reset;
+    reg fifo_1_reset;
+    reg fifo_0_full_reg_s01;
+    reg fifo_1_full_reg_s01;
+    reg fifo_0_full_delay_s01;
+    reg fifo_1_full_delay_s01;
+    reg fifo_0_read_en_latched;
+    reg fifo_1_read_en_latched;
+    reg fifo_0_rst_busy_latched_s01;
+    reg fifo_1_rst_busy_latched_s01;
+    reg fifo_0_empty_latched;
+    reg fifo_1_empty_latched;
+
+    wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_0_out_data;
+    wire [C_M00_AXIS_TDATA_WIDTH-1:0] fifo_1_out_data;
+    wire [11:0] fifo_0_wr_count;
+    wire [11:0] fifo_1_wr_count;
+    wire [11:0] fifo_0_rd_count;
+    wire [11:0] fifo_1_rd_count;
+    wire fifo_0_wr_rst_busy;
+    wire fifo_0_rd_rst_busy;
+    wire fifo_1_wr_rst_busy;
+    wire fifo_1_rd_rst_busy;
+
+    wire fifo_0_full_s01;
+    wire fifo_1_full_s01;
+    wire fifo_0_empty;
+    wire fifo_1_empty;
+    wire fifo_0_rst_busy_s01;
+    wire fifo_1_rst_busy_s01;
+    wire fifo_0_full_trigger_s01;
+    wire fifo_1_full_trigger_s01;
+    wire fifo_0_rst_combined_s01;
+    wire fifo_1_rst_combined_s01;
+    wire capture_enable_s01;
+
+    initial begin
+        fifo_0_empty_latched = 1'b0;
+        fifo_1_empty_latched = 1'b0;
+    end
+
     always @(posedge s01_axis_aclk or negedge s01_axis_aresetn) begin
-        if (!s01_axis_aresetn || user_reset) begin
-            received_counter <= 0;
-            fifo_0_rst_busy_latched <= 0;
-            fifo_1_rst_busy_latched <= 0;
+        if (!s01_axis_aresetn || user_reset_s01) begin
+            received_counter_s01 <= 0;
+            fifo_0_rst_busy_latched_s01 <= 0;
+            fifo_1_rst_busy_latched_s01 <= 0;
             fifo_0_reset <= 1;
             fifo_1_reset <= 1;
         end else begin
             // Write data to the appropriate buffer
             // Increment counter
             if (s01_axis_tvalid) begin
-                received_counter <= received_counter + 1;
+                received_counter_s01 <= received_counter_s01 + 1;
             end
 
             // Latch reset busy to delay extra cycle
-            fifo_0_rst_busy_latched <= fifo_0_rst_busy;
-            fifo_1_rst_busy_latched <= fifo_1_rst_busy;
+            fifo_0_rst_busy_latched_s01 <= fifo_0_rst_busy_s01;
+            fifo_1_rst_busy_latched_s01 <= fifo_1_rst_busy_s01;
 
             fifo_0_empty_latched <= fifo_0_empty;
             fifo_1_empty_latched <= fifo_1_empty;
@@ -321,48 +373,48 @@ module adc_to_udp_stream_v1_0 #
     end
 
     // When full select other buffer
-    assign fifo_0_rst_busy = fifo_0_wr_rst_busy || fifo_0_rd_rst_busy;
-    assign fifo_1_rst_busy = fifo_1_wr_rst_busy || fifo_1_rd_rst_busy;
-    assign fifo_0_rst_combined = fifo_0_rst_busy || fifo_0_rst_busy_latched;
-    assign fifo_1_rst_combined = fifo_1_rst_busy || fifo_1_rst_busy_latched;
-    assign buffer_select = fifo_0_full | fifo_0_full_reg;
+    assign buffer_select_s01 = fifo_0_full_s01 | fifo_0_full_reg_s01;
+    assign fifo_0_rst_busy_s01 = fifo_0_wr_rst_busy || fifo_0_rd_rst_busy;
+    assign fifo_1_rst_busy_s01 = fifo_1_wr_rst_busy || fifo_1_rd_rst_busy;
+    assign fifo_0_rst_combined_s01 = fifo_0_rst_busy_s01 || fifo_0_rst_busy_latched_s01;
+    assign fifo_1_rst_combined_s01 = fifo_1_rst_busy_s01 || fifo_1_rst_busy_latched_s01;
 
-    assign capture_enable = !user_reset || enable_next_pps_reset; 
-    assign fifo_0_write_en = s01_axis_tvalid && s01_axis_aresetn && capture_enable && !fifo_0_rst_combined && !buffer_select;
-    assign fifo_1_write_en = s01_axis_tvalid && s01_axis_aresetn && capture_enable && !fifo_1_rst_combined && buffer_select;
+    assign capture_enable_s01 = !user_reset_s01 || pps_detect_s01; 
+    assign fifo_0_write_en_s01 = s01_axis_tvalid && s01_axis_aresetn && capture_enable_s01 && !fifo_0_rst_combined_s01 && !buffer_select_s01;
+    assign fifo_1_write_en_s01 = s01_axis_tvalid && s01_axis_aresetn && capture_enable_s01 && !fifo_1_rst_combined_s01 && buffer_select_s01;
 
     // Flag fifo full transition for a single cycle
     always @(posedge m00_axis_aclk) begin
-        if (!m00_axis_aresetn || user_reset) begin
-            fifo_0_full_reg <= 1'b0;
-            fifo_0_full_delay <= 1'b0;
-            fifo_1_full_reg <= 1'b0;
-            fifo_1_full_delay <= 1'b0;
+        if (!m00_axis_aresetn || user_reset_m00) begin
+            fifo_0_full_reg_s01 <= 1'b0;
+            fifo_0_full_delay_s01 <= 1'b0;
+            fifo_1_full_reg_s01 <= 1'b0;
+            fifo_1_full_delay_s01 <= 1'b0;
             full_buffer_counter <= 1'b0;
         end else begin
-            if(fifo_0_full) begin
-                fifo_0_full_reg <= 1'b1;
+            if(fifo_0_full_s01) begin
+                fifo_0_full_reg_s01 <= 1'b1;
                 full_buffer_counter <= full_buffer_counter + 1;
-                if (!fifo_1_full) begin
-                    fifo_1_full_reg <= 1'b0;
+                if (!fifo_1_full_s01) begin
+                    fifo_1_full_reg_s01 <= 1'b0;
                 end
             end
-            if(fifo_1_full) begin
-                fifo_1_full_reg <= 1'b1;
+            if(fifo_1_full_s01) begin
+                fifo_1_full_reg_s01 <= 1'b1;
                 full_buffer_counter <= full_buffer_counter + 1;
-                if (!fifo_0_full) begin
-                    fifo_0_full_reg <= 1'b0;
+                if (!fifo_0_full_s01) begin
+                    fifo_0_full_reg_s01 <= 1'b0;
                 end
             end
 
-            fifo_0_full_delay <= fifo_0_full_reg;
-            fifo_1_full_delay <= fifo_1_full_reg;
+            fifo_0_full_delay_s01 <= fifo_0_full_reg_s01;
+            fifo_1_full_delay_s01 <= fifo_1_full_reg_s01;
         end
     end
 
-    assign fifo_0_full_trigger = fifo_0_full_reg && !fifo_0_full_delay;
-    assign fifo_1_full_trigger = fifo_1_full_reg && !fifo_1_full_delay;
-    assign update_packet = fifo_0_full_trigger || fifo_1_full_trigger;
+    assign fifo_0_full_trigger_s01 = fifo_0_full_reg_s01 && !fifo_0_full_delay_s01;
+    assign fifo_1_full_trigger_s01 = fifo_1_full_reg_s01 && !fifo_1_full_delay_s01;
+    assign update_packet_s01 = fifo_0_full_trigger_s01 || fifo_1_full_trigger_s01;
 
     xpm_fifo_async #(
         .FIFO_MEMORY_TYPE("block"),    // Use BRAM
@@ -376,13 +428,15 @@ module adc_to_udp_stream_v1_0 #
         .PROG_EMPTY_THRESH(3)
     ) fifo_0_inst (
         .rst(fifo_0_reset),
+        .sleep(1'b0),
+        .injectdbiterr(1'b0),
+        .injectsbiterr(1'b0),
 
         // Write side
         .wr_clk(s01_axis_aclk),
-        .wr_en(fifo_0_write_en),
+        .wr_en(fifo_0_write_en_s01),
         .din(s01_axis_tdata),
-        // .full(fifo_0_full),
-        .prog_full(fifo_0_full),
+        .prog_full(fifo_0_full_s01),
         .wr_data_count(fifo_0_wr_count),
         .wr_rst_busy(fifo_0_wr_rst_busy),
 
@@ -407,13 +461,15 @@ module adc_to_udp_stream_v1_0 #
         .PROG_EMPTY_THRESH(3)
     ) fifo_1_inst (
         .rst(fifo_1_reset),
+        .sleep(1'b0),
+        .injectdbiterr(1'b0),
+        .injectsbiterr(1'b0),
 
         // Write side
         .wr_clk(s01_axis_aclk),
-        .wr_en(fifo_1_write_en),
+        .wr_en(fifo_1_write_en_s01),
         .din(s01_axis_tdata),
-        // .full(fifo_1_full),
-        .prog_full(fifo_1_full),
+        .prog_full(fifo_1_full_s01),
         .wr_data_count(fifo_1_wr_count),
         .wr_rst_busy(fifo_1_wr_rst_busy),
 
@@ -507,17 +563,6 @@ module adc_to_udp_stream_v1_0 #
         end
     end
 
-    // Initialize state
-    initial begin
-        user_reset = 1'b1;
-        enable_next_pps_reset = 1'b0;
-        enable_next_pps_s00 = 1'b0;
-        pps_count = 32'h0;
-
-        fifo_0_empty_latched = 1'b0;
-        fifo_1_empty_latched = 1'b0;
-    end
-
     // Assign Radio Header
     assign radio_header[0] = sample_idx[7:0];
     assign radio_header[1] = sample_idx[15:8];
@@ -587,7 +632,7 @@ module adc_to_udp_stream_v1_0 #
     // Calculate IP Checksum
     always @(posedge m00_axis_aclk) begin
         // Reassign static packet on reset
-        if (!m00_axis_aresetn || user_reset || (update_packet == 1'b1)) begin
+        if (!m00_axis_aresetn || user_reset_m00 || (update_packet_s01 == 1'b1)) begin
             sum = 32'b0;
             ip_header[10] = 8'h0;
             ip_header[11] = 8'h0;
@@ -612,7 +657,7 @@ module adc_to_udp_stream_v1_0 #
     always @(posedge m00_axis_aclk) begin
         // Reassign static packet on reset or update
         // Update is triggered when sending a new packet
-        if (!m00_axis_aresetn || user_reset || (update_packet == 1'b1)) begin
+        if (!m00_axis_aresetn || user_reset_m00 || (update_packet_s01 == 1'b1)) begin
             // Ethernet Header
             udp_packet_int[0] <= eth_dst_mac[0];
             udp_packet_int[1] <= eth_dst_mac[1];
@@ -689,15 +734,37 @@ module adc_to_udp_stream_v1_0 #
     end
 
     //////////////////////////////////////////////////////////////////////////
-    // AXI4 Stream Data Bus
+    // AXI4 Stream Output Data Bus
     //////////////////////////////////////////////////////////////////////////
+    wire fifo_0_full_reg_m00;
+    wire fifo_1_full_reg_m00;
+    wire update_packet_m00;
+
     // Send UDP Packet over AXI bus
     assign start_payload = (packet_state >= (HEADER_STATE-FIFO_READ_DELAY)) && (packet_state <= FINAL_STATE);
     assign in_payload = (packet_state >= HEADER_STATE) && (packet_state <= FINAL_STATE);
 
+    signal_clock_sync fifo_0_full_sync (
+        .clk1_in(m00_axis_aclk),
+        .signal_clk0(fifo_0_full_reg_s01),
+        .signal_clk1(fifo_0_full_reg_m00)
+    );
+
+    signal_clock_sync fifo_1_full_sync (
+        .clk1_in(m00_axis_aclk),
+        .signal_clk0(fifo_1_full_reg_s01),
+        .signal_clk1(fifo_1_full_reg_m00)
+    );
+
+    signal_clock_sync update_packet_sync (
+        .clk1_in(m00_axis_aclk),
+        .signal_clk0(update_packet_s01),
+        .signal_clk1(update_packet_m00)
+    );
+
     reg udp_packet_axis_valid;
-    always @(posedge m00_axis_aclk) begin
-        if (~m00_axis_aresetn || user_reset) begin
+    always @(posedge m00_axis_aclk or negedge m00_axis_aresetn) begin
+        if (~m00_axis_aresetn || user_reset_m00) begin
             packet_idx <= 64'd0;
             packet_state <= 16'd0;
             fifo_0_read_en_latched <= 0;
@@ -707,7 +774,7 @@ module adc_to_udp_stream_v1_0 #
         end else begin
             // State machine to send the UDP packet over AXI4 Stream
             // start when input stream buffer is full
-            if (update_packet) begin
+            if (update_packet_m00) begin
                 // Reset state to start a new packet transmission
                 packet_state <= 16'd0;
                 start_udp_header <= 1'b1;
@@ -737,23 +804,23 @@ module adc_to_udp_stream_v1_0 #
             // update latched read enables
             if(start_payload) begin 
                 // Buffer select = 0, read from Buffer 1 
-                if (fifo_1_full_reg) begin
+                if (fifo_1_full_reg_m00) begin
                     fifo_1_read_en_latched <= 1;
                 end
 
                 // Buffer select = 1, read from Buffer 0 
-                if (fifo_0_full_reg) begin
+                if (fifo_0_full_reg_m00) begin
                     fifo_0_read_en_latched <= 1;
                 end
             end
 
             // Reset read enables when fifo is empty
             // of buffer is active for write
-            if (fifo_0_empty || !buffer_select) begin
+            if (fifo_0_empty || !buffer_select_s01) begin
                 fifo_0_read_en_latched <= 0;
             end
 
-            if (fifo_1_empty || buffer_select) begin
+            if (fifo_1_empty || buffer_select_s01) begin
                 fifo_1_read_en_latched <= 0;
             end
         end
@@ -762,11 +829,11 @@ module adc_to_udp_stream_v1_0 #
 
     // Assign the latched values to the read enables
     // disable when tready is low
-    assign fifo_0_read_en = fifo_0_read_en_latched && start_payload && m00_axis_tready && !fifo_0_rst_busy;
-    assign fifo_1_read_en = fifo_1_read_en_latched && start_payload && m00_axis_tready && !fifo_1_rst_busy;
+    assign fifo_0_read_en = fifo_0_read_en_latched && start_payload && m00_axis_tready && !fifo_0_rst_busy_s01;
+    assign fifo_1_read_en = fifo_1_read_en_latched && start_payload && m00_axis_tready && !fifo_1_rst_busy_s01;
 
-    always @(posedge m00_axis_aclk) begin
-        if (~m00_axis_aresetn || user_reset) begin
+    always @(posedge m00_axis_aclk or negedge m00_axis_aresetn) begin
+        if (~m00_axis_aresetn || user_reset_m00) begin
             udp_packet_axis_data <= 16'b0; // default to 0
             fifo_out_data_prev <= 16'b0; // default to 0
             udp_packet_axis_valid <= 1'b0;
@@ -793,13 +860,19 @@ module adc_to_udp_stream_v1_0 #
         end
     end
 
+    wire capture_enable_m00;
+    signal_clock_sync capture_enable_sync (
+        .clk1_in(m00_axis_aclk),
+        .signal_clk0(capture_enable_s01),
+        .signal_clk1(capture_enable_m00)
+    );
+
     // AXI4-Stream control signals
-    assign m00_axis_tvalid = udp_packet_axis_valid && capture_enable;     // Valid when we're in the middle of sending the packet
+    assign m00_axis_tvalid = udp_packet_axis_valid && capture_enable_m00;     // Valid when we're in the middle of sending the packet
     assign m00_axis_tdata = m00_axis_tvalid ? udp_packet_axis_data : 64'h0;               // Transmit each 64-bit word of the UDP packet
     assign m00_axis_tuser = 1'b0;
     assign m00_axis_tlast = (packet_state == FINAL_STATE + 1) && m00_axis_tvalid; // Mark the last word of the packet
     assign m00_axis_tkeep = m00_axis_tlast ? 8'h3 : 8'hFF;
-
 
     assign s01_axis_tready = 1'b1;
 
@@ -813,6 +886,20 @@ module adc_to_udp_stream_v1_0 #
     assign s00_axi_bvalid = s00_axi_wvalid;
     assign s00_axi_arready = 1'b1;
     assign s00_axi_rresp = 2'b00;
+
+    wire pps_detect_s00;
+    signal_clock_sync pps_detect_sync (
+        .clk1_in(m00_axis_aclk),
+        .signal_clk0(pps_detect_s01),
+        .signal_clk1(pps_detect_s00)
+    );
+
+    wire received_counter_m00;
+    signal_clock_sync received_counter_sync (
+        .clk1_in(m00_axis_aclk),
+        .signal_clk0(received_counter_s01),
+        .signal_clk1(received_counter_m00)
+    );
 
     // Write Logic
     always @(posedge s00_axi_aclk) begin
@@ -834,7 +921,7 @@ module adc_to_udp_stream_v1_0 #
             // Handle AXI write logic
             case (s00_axi_awaddr)
                 32'h0000_0000: begin 
-                    user_reset <= s00_axi_wdata[0];
+                    user_reset_s00 <= s00_axi_wdata[0];
                     enable_next_pps_s00 <= s00_axi_wdata[1];
                 end
                 32'h0000_0004: frequency_idx[31:0] <= s00_axi_wdata[31:0];
@@ -903,9 +990,9 @@ module adc_to_udp_stream_v1_0 #
             endcase
         end 
 
-        // Set user reset after enable_next_pps_reset is triggered
-        if (enable_next_pps_reset && enable_next_pps_s00) begin
-            user_reset <= 1'b0;
+        // Set user reset after pps_detect is triggered
+        if (pps_detect_s00 && enable_next_pps_s00) begin
+            user_reset_s00 <= 1'b0;
             enable_next_pps_s00 = 1'b0;
         end
     end
@@ -916,9 +1003,9 @@ module adc_to_udp_stream_v1_0 #
             s00_axi_rdata <= 32'b0;
         end else if (s00_axi_arvalid && !s00_axi_rvalid) begin
             case (s00_axi_araddr)
-                32'h0000_0000: s00_axi_rdata = {30'h0, enable_next_pps_s00, user_reset}; 
+                32'h0000_0000: s00_axi_rdata = {30'h0, enable_next_pps_s00, user_reset_s00}; 
                 32'h0000_0004: s00_axi_rdata = frequency_idx;
-                32'h0000_0008: s00_axi_rdata = received_counter;           
+                32'h0000_0008: s00_axi_rdata = received_counter_s01;           
                 32'h0000_000C: begin
                     s00_axi_rdata = {eth_dst_mac[2], eth_dst_mac[3], eth_dst_mac[4], eth_dst_mac[5]};
                 end
