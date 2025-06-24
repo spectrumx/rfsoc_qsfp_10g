@@ -1231,7 +1231,7 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/adc_to_udp_stream_v1_9.v</spirit:name>
+        <spirit:name>hdl/adc_to_udp_stream_v1_0.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
         <spirit:userFileType>CHECKSUM_894773c5</spirit:userFileType>
       </spirit:file>
@@ -1251,7 +1251,7 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/adc_to_udp_stream_v1_9.v</spirit:name>
+        <spirit:name>hdl/adc_to_udp_stream_v1_0.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
     </spirit:fileSet>
