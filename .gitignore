@@ -3,6 +3,8 @@
 
 # Vivado Files
 boards/RFSoC4x2/rfsoc_offload/rfsoc_offload/
+boars/RFSoC4x2/adc_to_udp.sim
+boars/RFSoC4x2/adc_to_udp.sim/*
 *.log
 *.str
 *.jou
