@@ -1,0 +1,1 @@
+sudo cp ./rfsoc4x2_lmk_CLKin0_extref_10M_PL_122M88_LMXREF_245M76.txt /usr/local/share/pynq-venv/lib/python3.10/site-packages/xrfclk/LMK04828_122.88.txt

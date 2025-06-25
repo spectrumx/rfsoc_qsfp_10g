@@ -2,104 +2,158 @@ import time
 import signal
 import sys
 import argparse
+import logging
+import termios
+import tty
 import xrfdc
 import xrfclk
 from rfsoc_qsfp_offload.overlay import Overlay
 
 global exit_flag
 
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+RED = "\033[91m"
+RESET = "\033[0m"
+
 def signal_handler(sig, frame):
-    print('')
-    print('Exiting RF capture')
+    logging.info('')
+    logging.info('Exiting RF capture')
     global exit_flag
     exit_flag = True
     
 def main(args):
-    
-    f_c = args.freq
-    print(f"Starting RF capture on ADC Channel {args.channels} at {f_c:0.3f} MHz") 
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+ 
+    logging.info(f"Starting RF capture on ADC Channel {BLUE}{args.channels}{RESET} at {BLUE}{args.freq:0.3f} MHz{RESET}") 
 
     board_ip = '192.168.4.99'
     client_ip = '192.168.4.1'
 
-    print("Initializing RFSoC 10G Overlay")
+    logging.info("Initializing RFSoC 10G Overlay")
     ol = Overlay(ignore_version=True)
 
     # Wait for overlay to initialize
-    time.sleep(5) # Magic sleep
+    time.sleep(5) 
+
+    # Disable all ADC UDP streams
     ol.adc_to_udp_stream_A.register_map.USER_RESET = 1
     ol.adc_to_udp_stream_B.register_map.USER_RESET = 1
+    ol.adc_to_udp_stream_C.register_map.USER_RESET = 1
+    ol.adc_to_udp_stream_D.register_map.USER_RESET = 1
+
+    # Set reference clocks
+    lmx_freq=491.52
+
+    # Config file for lmk_freq = 245.76 defaults to RFSoC VCO clock
+    # xrfclk.set_ref_clks(lmk_freq=245.76, lmx_freq=lmx_freq)
+
+    # Config file for lmk_freq = 122.88 defaults to external clock reference
+    xrfclk.set_ref_clks(lmk_freq=122.88, lmx_freq=lmx_freq)
 
     # Start ADC
-    ADC_TILE = 2       # ADC Tile 226
-    ADC_SAMPLE_FREQUENCY = 1024  # MSps
-    ADC_PLL_FREQUENCY    = 491.52   # MHz
-    ADC_DECIMATION = 16 # Default, not actively set
-    ADC_FC = -1*f_c # FM Band
+    ADC_SAMPLE_FREQUENCY = 1024     # MSps
+    ADC_DECIMATION = 16             # Default, not actively set
 
-    pll_freq = ADC_PLL_FREQUENCY
+    pll_freq = lmx_freq             # MHz
     fs = ADC_SAMPLE_FREQUENCY
-    tile = ADC_TILE
-    fc = ADC_FC
+    f_c = -1*args.freq              # User input
 
-    mixer_settings_block_0 = {
+    mixer_settings_block = {
             'CoarseMixFreq':  xrfdc.COARSE_MIX_BYPASS,
             'EventSource':    xrfdc.EVNT_SRC_TILE,
             'FineMixerScale': xrfdc.MIXER_SCALE_1P0,
-            'Freq':           fc,
+            'Freq':           f_c,
             'MixerMode':      xrfdc.MIXER_MODE_R2C,
             'MixerType':      xrfdc.MIXER_TYPE_FINE,
             'PhaseOffset':    0.0
             }
 
-    block = 0       # ADC Block 0 (B)
-    ol.rfdc.adc_tiles[tile].DynamicPLLConfig(1, pll_freq, fs)
-    ol.rfdc.adc_tiles[tile].blocks[block].NyquistZone = 1
-    ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = mixer_settings_block_0
-    ol.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
+    # Configure all ADC channels to same f_c
+    adc_tile_block = ((0,0), (0,1), (2,0), (2,1))
+    mixer_blocks = [mixer_settings_block.copy(), mixer_settings_block.copy(), 
+                   mixer_settings_block.copy(), mixer_settings_block.copy()]
 
-    mixer_settings_block_1 = mixer_settings_block_0.copy()
+    for (tile, block), mixer in zip(adc_tile_block, mixer_blocks):
+        ol.rfdc.adc_tiles[tile].DynamicPLLConfig(1, pll_freq, fs)
+        ol.rfdc.adc_tiles[tile].blocks[block].NyquistZone = 1
+        ol.rfdc.adc_tiles[tile].blocks[block].MixerSettings = mixer
+        ol.rfdc.adc_tiles[tile].blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
+        ol.rfdc.adc_tiles[tile].SetupFIFO(True)
 
-    ol.rfdc.adc_tiles[tile].blocks[1].NyquistZone = 1
-    ol.rfdc.adc_tiles[tile].blocks[1].MixerSettings = mixer_settings_block_1
-    ol.rfdc.adc_tiles[tile].blocks[1].UpdateEvent(xrfdc.EVENT_MIXER)
-    ol.rfdc.adc_tiles[tile].SetupFIFO(True)
+    logging.info(f"Starting UDP stream on: {BLUE}{args.channels}{RESET}")
 
+    # Wait for beginning of second to initiate capture
+    current_time = time.time()
+    start_time = current_time
+    while((current_time - int(current_time)) > .5):
+        time.sleep(.1)
+        current_time = time.time()
+
+    # Delay 100ms for PPS sync
+    time.sleep(.1)
+    current_time = time.time()
+
+    # Set enable on next pps capture 
     # Configure UDP Header for new sample rate
-    ol.adc_to_udp_stream_A.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
-    ol.adc_to_udp_stream_B.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
-
     # Set center frequency
-    ol.adc_to_udp_stream_A.register_map.FREQUENCY_IDX =  f_c * 1e6
-    ol.adc_to_udp_stream_B.register_map.FREQUENCY_IDX =  f_c * 1e6
+    if 'A' in args.channels:
+        ol.adc_to_udp_stream_A.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
+        ol.adc_to_udp_stream_A.register_map.FREQUENCY_IDX =  f_c * 1e6
+        ol.adc_to_udp_stream_A.register_map.CTRL = 3 # Set A control reg to 0x11
+    if 'B' in args.channels:
+        ol.adc_to_udp_stream_B.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
+        ol.adc_to_udp_stream_B.register_map.FREQUENCY_IDX =  f_c * 1e6
+        ol.adc_to_udp_stream_B.register_map.CTRL = 3 # Set B control reg to 0x11
+    if 'C' in args.channels:
+        ol.adc_to_udp_stream_C.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
+        ol.adc_to_udp_stream_C.register_map.FREQUENCY_IDX =  f_c * 1e6
+        ol.adc_to_udp_stream_C.register_map.CTRL = 3 # Set C control reg to 0x11
+    if 'D' in args.channels:
+        ol.adc_to_udp_stream_D.register_map.SAMPLE_RATE_NUMERATOR_LSB = ADC_SAMPLE_FREQUENCY * 1e6
+        ol.adc_to_udp_stream_D.register_map.FREQUENCY_IDX =  f_c * 1e6
+        ol.adc_to_udp_stream_D.register_map.CTRL = 3 # Set D control reg to 0x11
 
-    print(f"Starting UDP stream on: {args.channels}")
-
-    # Set starting sample
-    start_time = time.time()
-    samples_since_epoch = int(start_time * ((ADC_SAMPLE_FREQUENCY * 1e6) / ADC_DECIMATION))
+    # Set start time in UDP Header
+    current_time_s = int(current_time) + 1          # Stream starts PPS edge
+    samples_since_epoch = int(current_time_s * ((ADC_SAMPLE_FREQUENCY * 1e6)/ ADC_DECIMATION))
     samples_since_epoch_lsb = samples_since_epoch & 0xFFFFFFFF
     samples_since_epoch_msb = samples_since_epoch >> 32
     ol.adc_to_udp_stream_A.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
     ol.adc_to_udp_stream_A.register_map.SAMPLE_IDX_OFFSET_MSB = samples_since_epoch_msb
     ol.adc_to_udp_stream_B.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
     ol.adc_to_udp_stream_B.register_map.SAMPLE_IDX_OFFSET_MSB = samples_since_epoch_msb
+    ol.adc_to_udp_stream_C.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
+    ol.adc_to_udp_stream_C.register_map.SAMPLE_IDX_OFFSET_MSB = samples_since_epoch_msb
+    ol.adc_to_udp_stream_D.register_map.SAMPLE_IDX_OFFSET_LSB = samples_since_epoch_lsb
+    ol.adc_to_udp_stream_D.register_map.SAMPLE_IDX_OFFSET_MSB = samples_since_epoch_msb
 
-    if 'A' in args.channels:
-        ol.adc_to_udp_stream_A.register_map.USER_RESET = 0
-    if 'B' in args.channels:
-        ol.adc_to_udp_stream_B.register_map.USER_RESET = 0
-    
-    print(f"Start time: {start_time} sample offset: {samples_since_epoch}")
+    logging.info(f"Capture initiated at: {BLUE}{start_time}{RESET}")
+    while(int(ol.adc_to_udp_stream_A.register_map.PPS_COUNTER) < 1
+          and int(ol.adc_to_udp_stream_B.register_map.PPS_COUNTER) < 1
+          and int(ol.adc_to_udp_stream_C.register_map.PPS_COUNTER) < 1
+          and int(ol.adc_to_udp_stream_D.register_map.PPS_COUNTER) < 1):
+        time.sleep(.01)
 
-    print("Ctrl-C to exit")
+    logging.info(f"{GREEN}PPS Trigger received{RESET}")
+    logging.info(f"Capture started at:   {BLUE}{current_time_s}{RESET} sample_offset: {BLUE}{samples_since_epoch}{RESET}")
+
+    global exit_flag
+    print("CTRL-C to exit")
     while(not exit_flag):
+        pps_count = max(
+            int(ol.adc_to_udp_stream_A.register_map.PPS_COUNTER),
+            int(ol.adc_to_udp_stream_B.register_map.PPS_COUNTER),
+            int(ol.adc_to_udp_stream_C.register_map.PPS_COUNTER),
+            int(ol.adc_to_udp_stream_D.register_map.PPS_COUNTER))
+        print(f"\rElapsed capture time: {BLUE}{pps_count}{RESET}", end='', flush=True)
         time.sleep(1)
-        print(".", end='', flush=True)
 
-    print("Stopping UDP stream")
-    ol.adc_to_udp_stream_A.register_map.USER_RESET = 1
-    ol.adc_to_udp_stream_B.register_map.USER_RESET = 1
+    logging.info("Stopping UDP stream")
+    ol.adc_to_udp_stream_A.register_map.CTRL = 1
+    ol.adc_to_udp_stream_B.register_map.CTRL = 1
+    ol.adc_to_udp_stream_C.register_map.CTRL = 1
+    ol.adc_to_udp_stream_D.register_map.CTRL = 1
 
 if __name__ == "__main__":
     # CTRL-C handler
