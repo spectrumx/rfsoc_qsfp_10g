@@ -8,6 +8,7 @@ import tty
 import xrfdc
 import xrfclk
 import zmq
+import zmq
 from rfsoc_qsfp_offload.overlay import Overlay
 from enum import Enum
 
