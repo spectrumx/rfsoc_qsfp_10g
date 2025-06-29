@@ -93,6 +93,7 @@ def main(args):
     # Initialize data struct
     data = CaptureData()
     data.f_if_hz = args.freq * 1e6
+    data.pps_count = 0
 
     # ZMQ context and sockets
     logging.info(f"ZMQ Publish to {ZMQ_PUB_SOCKET}")
@@ -131,7 +132,8 @@ def main(args):
         xrfclk.set_ref_clks(lmk_freq=122.88, lmx_freq=lmx_freq)
 
     # Configure ADC
-    adc_f_c = -1*data.f_if_hz           # User input
+    adc_f_c_hz = -1*data.f_if_hz           # User input
+    adc_f_c_mhz = adc_f_c_hz / 1e6
     adc_f_s = ADC_SAMPLE_FREQUENCY
     pll_freq = lmx_freq                 # MHz
 
@@ -139,7 +141,7 @@ def main(args):
             'CoarseMixFreq':  xrfdc.COARSE_MIX_BYPASS,
             'EventSource':    xrfdc.EVNT_SRC_TILE,
             'FineMixerScale': xrfdc.MIXER_SCALE_1P0,
-            'Freq':           adc_f_c,
+            'Freq':           adc_f_c_mhz,
             'MixerMode':      xrfdc.MIXER_MODE_R2C,
             'MixerType':      xrfdc.MIXER_TYPE_FINE,
             'PhaseOffset':    0.0
@@ -160,7 +162,7 @@ def main(args):
     logging.info(f"Starting UDP stream on: {BLUE}{data.channels}{RESET}")
 
     # Set center frequency
-    set_freq_metadata(adc_f_c * 1e6, data)
+    set_freq_metadata(adc_f_c_hz, data)
     set_sample_rate((ADC_SAMPLE_FREQUENCY * 1e6)/ ADC_DECIMATION, data)
 
     # Set enable on next pps capture 
@@ -187,6 +189,7 @@ def main(args):
             int(data.ol.adc_to_udp_stream_D.register_map.PPS_COUNTER))
         if(pps_count > pps_count_last):
             print(f"\rElapsed capture time: {BLUE}{pps_count}{RESET}", end='', flush=True)
+            data.pps_count = pps_count
 
     logging.info("Stopping UDP stream")
 
@@ -208,16 +211,17 @@ def set_sample_rate(sample_rate, data):
         data.ol.adc_to_udp_stream_D.register_map.SAMPLE_RATE_NUMERATOR_LSB = sample_rate_raw
 
 def set_freq_metadata(f_c_hz, data):
-    data.f_c_hz = f_c_hz
-    logging.info(f"Setting frequency metadata to: {f_c_hz}")
+    data.f_c_hz = int(f_c_hz)
+    f_c_khz = data.f_c_hz / 1e3
+    logging.info(f"Setting frequency metadata to: {f_c_khz} kHz")
     if 'A' in data.channels:
-        data.ol.adc_to_udp_stream_A.register_map.FREQUENCY_IDX =  f_c_hz
+        data.ol.adc_to_udp_stream_A.register_map.FREQUENCY_IDX =  f_c_khz
     if 'B' in data.channels:
-        data.ol.adc_to_udp_stream_B.register_map.FREQUENCY_IDX =  f_c_hz 
+        data.ol.adc_to_udp_stream_B.register_map.FREQUENCY_IDX =  f_c_khz 
     if 'C' in data.channels:
-        data.ol.adc_to_udp_stream_C.register_map.FREQUENCY_IDX =  f_c_hz
+        data.ol.adc_to_udp_stream_C.register_map.FREQUENCY_IDX =  f_c_khz
     if 'D' in data.channels:
-        data.ol.adc_to_udp_stream_D.register_map.FREQUENCY_IDX =  f_c_hz 
+        data.ol.adc_to_udp_stream_D.register_map.FREQUENCY_IDX =  f_c_khz 
 
 def capture_now(data):
     set_channel_ctrl(Ctrl.RESET, data)
@@ -238,6 +242,7 @@ def capture_now(data):
 def capture_next_pps(data):
     # Start in RESET
     set_channel_ctrl(Ctrl.RESET, data)
+    data.pps_count = 0
 
     # Wait for beginning of second to initiate capture
     current_time = time.time()
@@ -340,10 +345,11 @@ def zmq_cmd_handler(message, data):
 
         if (get_param == "tlm"):
             logging.info("Sending telemetry")
-            tlm_str = f"tlm {data.state},"
-            tlm_str += f"{data.f_c_hz},"
-            tlm_str += f"{data.f_if_hz},"
-            tlm_str += f"{data.f_s},"
+            tlm_str = f"tlm {data.state};"
+            tlm_str += f"{data.f_c_hz};"
+            tlm_str += f"{data.f_if_hz};"
+            tlm_str += f"{data.f_s};"
+            tlm_str += f"{data.pps_count};"
             tlm_str += f"{data.channels}"
             data.pub_socket.send_string(tlm_str)
     elif (command == "help"):
