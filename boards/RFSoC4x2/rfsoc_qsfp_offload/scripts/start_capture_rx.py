@@ -173,7 +173,6 @@ def main(args):
             capture_now(data)
 
     pps_count_last = 0
-    print("CTRL-C to exit")
     while(not exit_flag):
         # Check for incoming messages with 10ms timeout
         socks = dict(poller.poll(timeout=10))
@@ -189,7 +188,7 @@ def main(args):
             int(data.ol.adc_to_udp_stream_D.register_map.PPS_COUNTER))
         if(pps_count > pps_count_last):
             if(args.log_level == logging.DEBUG):
-                print(f"\rElapsed capture time: {BLUE}{pps_count}{RESET}", end='', flush=True)
+                logging.debug(f"Elapsed capture time: {BLUE}{pps_count}{RESET}")
             data.pps_count = pps_count
 
     logging.info("Stopping UDP stream")
@@ -305,7 +304,7 @@ def set_channel_ctrl(ctrl, data):
         data.state = 'inactive'
 
 def zmq_cmd_handler(message, data):
-    logging.debug(f"\nReceived: {message}")
+    logging.debug(f"Received: {message}")
 
     if not message.startswith("cmd "):
         logging.warning("Invalid command format")
