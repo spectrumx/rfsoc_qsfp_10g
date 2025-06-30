@@ -76,14 +76,14 @@ def main(args):
     log_filepath = os.path.join(LOG_DIR, log_filename)
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=args.log_level,
         format='%(asctime)s - %(levelname)s - %(message)s',
         filename=log_filepath
     )
 
     # Add console handler to also log to terminal
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(args.log_level)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(formatter)
     logging.getLogger().addHandler(console_handler)
@@ -188,7 +188,8 @@ def main(args):
             int(data.ol.adc_to_udp_stream_C.register_map.PPS_COUNTER),
             int(data.ol.adc_to_udp_stream_D.register_map.PPS_COUNTER))
         if(pps_count > pps_count_last):
-            print(f"\rElapsed capture time: {BLUE}{pps_count}{RESET}", end='', flush=True)
+            if(args.log_level == logging.DEBUG):
+                print(f"\rElapsed capture time: {BLUE}{pps_count}{RESET}", end='', flush=True)
             data.pps_count = pps_count
 
     logging.info("Stopping UDP stream")
@@ -287,7 +288,7 @@ def capture_next_pps(data):
     logging.info(f"Capture started at:   {BLUE}{current_time_s}{RESET} sample_offset: {BLUE}{samples_since_epoch}{RESET}")
 
 def set_channel_ctrl(ctrl, data):
-    logging.info(f"Set CTRL on {data.channels} to {ctrl}")
+    logging.debug(f"Set CTRL on {data.channels} to {ctrl}")
     if 'A' in data.channels:
         data.ol.adc_to_udp_stream_A.register_map.CTRL = ctrl.value # Set A control reg to 0x11
     if 'B' in data.channels:
@@ -304,8 +305,7 @@ def set_channel_ctrl(ctrl, data):
         data.state = 'inactive'
 
 def zmq_cmd_handler(message, data):
-    print("") # Newline
-    logging.info(f"Received: {message}")
+    logging.debug(f"\nReceived: {message}")
 
     if not message.startswith("cmd "):
         logging.warning("Invalid command format")
@@ -326,7 +326,7 @@ def zmq_cmd_handler(message, data):
     elif (command == "capture_next_pps"):
         capture_next_pps(data)
     elif (command == "set"):
-        logging.info(f"Received command: {command} with args: {args}")
+        logging.debug(f"Received command: {command} with args: {args}")
         if len(args) != 2:
             logging.warning(f"Invalid set command")
             return
@@ -344,7 +344,7 @@ def zmq_cmd_handler(message, data):
         get_param = args[0]
 
         if (get_param == "tlm"):
-            logging.info("Sending telemetry")
+            logging.debug("Sending telemetry")
             tlm_str = f"tlm {data.state};"
             tlm_str += f"{data.f_c_hz};"
             tlm_str += f"{data.f_if_hz};"
@@ -394,5 +394,7 @@ if __name__ == "__main__":
                         help='Hold capture in reset on start')
     parser.add_argument('-i','--internal_clock', action='store_true', 
                         help='Disable external clock and use internal VCO')
+    parser.add_argument('--log-level', '-l', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        help='Set logging level (default: INFO)')
     args = parser.parse_args()
     main(args)
