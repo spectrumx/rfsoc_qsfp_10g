@@ -51,7 +51,8 @@ def signal_handler(sig, frame):
 
 def update_adc_nco(freq_mhz, data):
     try:
-        freq_hz = float(freq_mhz) * 1e6
+        freq_mhz = float(freq_mhz)  # <=== THIS LINE FIXES IT
+        freq_hz = freq_mhz * 1e6
         data.f_if_hz = freq_hz
         adc_f_c_hz = -1 * freq_hz
         adc_f_c_mhz = adc_f_c_hz / 1e6
