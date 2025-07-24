@@ -11,3 +11,7 @@ boars/RFSoC4x2/adc_to_udp.sim/*
 NA/
 .Xil/
 *.swp
+build/
+boards/RFSoC4x2/rfsoc_qsfp_offload/scripts/start_capture_rx.py.bak
+/rfsoc_qsfp_offload.egg-info
+/rfsoc_qsfp_offload/assets
