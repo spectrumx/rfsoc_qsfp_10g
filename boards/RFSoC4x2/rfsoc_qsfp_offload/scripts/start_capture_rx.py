@@ -77,8 +77,7 @@ def update_adc_nco(freq_mhz, data):
             adc_tile.blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
             adc_tile.SetupFIFO(True)
 
-        # frequency metadata tag in kHz
-        set_freq_metadata(freq_hz / 1e3, data)
+        set_freq_metadata(freq_hz, data)
         logging.info(f"ADC mixer and metadata updated to {freq_mhz:.2f} MHz")
     except Exception as e:
         logging.error(f"Failed to update full ADC mixer configuration: {e}")
@@ -109,7 +108,7 @@ def zmq_cmd_handler(message, data):
             return
         set_param, set_value = args
         if set_param == "freq_metadata": # Change the Center Frequency for metadata purposes
-            set_freq_metadata(int(float(set_value) * 1e3), data)
+            set_freq_metadata(set_value, data)
         elif set_param == "freq_IF": # Change the actual IF frequency without restarting the whole script
             update_adc_nco(set_value, data)
         else:
