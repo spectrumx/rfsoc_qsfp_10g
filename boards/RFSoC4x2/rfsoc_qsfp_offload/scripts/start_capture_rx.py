@@ -77,7 +77,8 @@ def update_adc_nco(freq_mhz, data):
             adc_tile.blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
             adc_tile.SetupFIFO(True)
 
-        set_freq_metadata(adc_f_c_hz, data)
+        # frequency metadata tag in kHz
+        set_freq_metadata(freq_hz / 1e3, data)
         logging.info(f"ADC mixer and metadata updated to {freq_mhz:.2f} MHz")
     except Exception as e:
         logging.error(f"Failed to update full ADC mixer configuration: {e}")
@@ -171,7 +172,7 @@ def main(args):
     Main function for the RX capture script
 
     Args:
-        args (argparse.Namespace): Command-line arguments. 
+        args (argparse.Namespace): Command-line arguments.
 
     """
     global exit_flag
