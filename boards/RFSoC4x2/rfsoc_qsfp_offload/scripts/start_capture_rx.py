@@ -108,7 +108,7 @@ def zmq_cmd_handler(message, data):
             return
         set_param, set_value = args
         if set_param == "freq_metadata": # Change the Center Frequency for metadata purposes
-            set_freq_metadata(int(float(set_value) * 1e3), data)
+            set_freq_metadata(set_value, data)
         elif set_param == "freq_IF": # Change the actual IF frequency without restarting the whole script
             update_adc_nco(set_value, data)
         else:
