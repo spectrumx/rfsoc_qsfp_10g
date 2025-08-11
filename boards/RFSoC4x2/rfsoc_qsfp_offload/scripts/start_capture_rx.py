@@ -77,8 +77,7 @@ def update_adc_nco(freq_mhz, data):
             adc_tile.blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
             adc_tile.SetupFIFO(True)
 
-        # frequency metadata tag in kHz
-        set_freq_metadata(freq_hz / 1e3, data)
+        set_freq_metadata(freq_hz, data)
         logging.info(f"ADC mixer and metadata updated to {freq_mhz:.2f} MHz")
     except Exception as e:
         logging.error(f"Failed to update full ADC mixer configuration: {e}")
