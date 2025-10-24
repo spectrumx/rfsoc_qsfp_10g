@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 
-import os, sys
+import os
 import time
 import signal
 import argparse
 import logging
-import termios
-import tty
+import json
 import xrfdc
 import xrfclk
-import zmq
+import paho.mqtt.client as mqtt
 from rfsoc_qsfp_offload.overlay import Overlay
 from enum import Enum
 
-ZMQ_PUB_SOCKET = "tcp://*:60201"
-ZMQ_SUB_SOCKET = "tcp://192.168.20.1:60200"
+service_name = "rfsoc"
+MQTT_BROKER = "192.168.20.1"
+MQTT_PORT = 1883
+MQTT_CMD_TOPIC = service_name + "/command"
+MQTT_TLM_TOPIC = "rfcapture/telemetry"
 LOG_DIR = '/var/log/spectrumx'
 
 ADC_SAMPLE_FREQUENCY = 1024     # MSps
@@ -26,6 +28,7 @@ GREEN = "\033[92m"
 BLUE = "\033[94m"
 RED = "\033[91m"
 RESET = "\033[0m"
+
 
 exit_flag = False
 
@@ -41,8 +44,26 @@ class CaptureData:
         self.f_if_hz = float('nan')
         self.f_s = float('nan')
         self.channels = []
-        self.pub_socket = None
+        self.mqtt_client = None
         self.ol = None
+
+data = CaptureData()
+
+def send_status(data):
+    """
+    Publish the current state and tuned frequency to the MQTT status topic.
+    """
+    status_topic = f"{service_name}/status"
+    status_payload = {
+        "state": data.state,
+        "f_c_hz": data.f_c_hz,
+        "f_if_hz": data.f_if_hz,
+        "f_s": data.f_s,
+        "pps_count": data.pps_count,
+        "channels": data.channels
+    }
+    if data.mqtt_client:
+        data.mqtt_client.publish(status_topic, json.dumps(status_payload))
 
 def signal_handler(sig, frame):
     global exit_flag
@@ -82,44 +103,57 @@ def update_adc_nco(freq_mhz, data):
     except Exception as e:
         logging.error(f"Failed to update full ADC mixer configuration: {e}")
 
-def zmq_cmd_handler(message, data):
-    logging.debug(f"Received: {message}")
-    if not message.startswith("cmd "):
-        logging.warning("Invalid command format")
-        return
+def on_message(client, userdata, msg):
+    global data
+    try:
+    #   data = userdata
+      message = msg.payload.decode()
+      logging.debug(f"Received MQTT: {message}")
+      if not message.startswith("cmd "):
+          logging.warning("Invalid command format")
+          return
 
-    parts = message[4:].split()
-    if not parts:
-        logging.warning("No command specified")
-        return
+      parts = message[4:].split()
+      if not parts:
+          logging.warning("No command specified")
+          return
 
-    command = parts[0]
-    args = parts[1:]
+      command = parts[0]
+      args = parts[1:]
 
-    if command == "reset":
-        set_channel_ctrl(Ctrl.RESET, data)
-    elif command == "capture":
-        capture_now(data)
-    elif command == "capture_next_pps":
-        capture_next_pps(data)
-    elif command == "set":
-        if len(args) != 2:
+      if command == "reset":
+          set_channel_ctrl(Ctrl.RESET, data)
+          send_status(data)
+      elif command == "capture":
+          capture_now(data)
+          send_status(data)
+      elif command == "capture_next_pps":
+          capture_next_pps(data)
+          send_status(data)
+      elif command == "set":
+          if len(args) != 2:
             logging.warning("Invalid set command")
             return
-        set_param, set_value = args
-        if set_param == "freq_metadata": # Change the Center Frequency for metadata purposes
+          set_param, set_value = args
+          if set_param == "freq_metadata":
             set_freq_metadata(set_value, data)
-        elif set_param == "freq_IF": # Change the actual IF frequency without restarting the whole script
+            send_status(data)
+          elif set_param == "freq_IF":
             update_adc_nco(set_value, data)
-        else:
-            logging.warning(f"Unknown set parameter: {set_param}")
-    elif command == "get":
-        if args and args[0] == "tlm":
-            tlm_str = f"tlm {data.state};{data.f_c_hz};{data.f_if_hz};{data.f_s};{data.pps_count};{data.channels}"
-            data.pub_socket.send_string(tlm_str)
-    elif command == "quit":
-        global exit_flag
-        exit_flag = True
+            send_status(data)
+          elif set_param == "channel":
+            data.channels = [set_value]
+            logging.info(f"Set active channels to: {data.channels}")
+            set_channel_ctrl(Ctrl.RESET, data)
+            send_status(data)
+          else:
+              logging.warning(f"Unknown set parameter: {set_param}")
+      elif command == "get":
+          if args and args[0] == "tlm":
+              # data.mqtt_client.publish(MQTT_TLM_TOPIC, tlm_str)
+              send_status(data)
+    except Exception as e:
+      logging.error(f"Error processing MQTT message: {e}")
 
 def set_sample_rate(sample_rate, data):
     data.f_s = sample_rate
@@ -167,6 +201,7 @@ def capture_next_pps(data):
     set_channel_ctrl(Ctrl.CAPTURE_NEXT_PPS, data)
 
 def main(args):
+    global data
     """
     Main function for the RX capture script
 
@@ -187,18 +222,17 @@ def main(args):
     logging.getLogger().addHandler(console)
 
     logging.info(f"Starting RF capture on ADC Channel {BLUE}{args.channels}{RESET} at {BLUE}{args.freq:.3f} MHz{RESET}")
-    data = CaptureData()
     data.f_if_hz = args.freq * 1e6
     data.pps_count = 0
 
-    context = zmq.Context()
-    sub_socket = context.socket(zmq.SUB)
-    sub_socket.connect(ZMQ_SUB_SOCKET)
-    sub_socket.setsockopt_string(zmq.SUBSCRIBE, "cmd")
-    poller = zmq.Poller()
-    poller.register(sub_socket, zmq.POLLIN)
-    data.pub_socket = context.socket(zmq.PUB)
-    data.pub_socket.bind(ZMQ_PUB_SOCKET)
+
+    # Setup MQTT client
+    mqtt_client = mqtt.Client(userdata=data)
+    data.mqtt_client = mqtt_client
+    mqtt_client.on_message = on_message
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    mqtt_client.subscribe(MQTT_CMD_TOPIC)
+    mqtt_client.loop_start()
 
     logging.info("Initializing RFSoC 10G Overlay")
     data.ol = Overlay(ignore_version=True)
@@ -224,20 +258,22 @@ def main(args):
         else:
             capture_next_pps(data)
 
+
     pps_count_last = 0
-    while not exit_flag:
-        socks = dict(poller.poll(timeout=10))
-        if sub_socket in socks:
-            zmq_cmd_handler(sub_socket.recv_string(), data)
-        pps = max(
-            int(data.ol.adc_to_udp_stream_A.register_map.PPS_COUNTER),
-            int(data.ol.adc_to_udp_stream_B.register_map.PPS_COUNTER),
-            int(data.ol.adc_to_udp_stream_C.register_map.PPS_COUNTER),
-            int(data.ol.adc_to_udp_stream_D.register_map.PPS_COUNTER),
-        )
-        if pps > pps_count_last:
-            data.pps_count = pps
-            pps_count_last = pps
+    try:
+        while not exit_flag:
+            time.sleep(0.1)
+            pps = max(
+                int(data.ol.adc_to_udp_stream_A.register_map.PPS_COUNTER),
+                int(data.ol.adc_to_udp_stream_B.register_map.PPS_COUNTER),
+                int(data.ol.adc_to_udp_stream_C.register_map.PPS_COUNTER),
+                int(data.ol.adc_to_udp_stream_D.register_map.PPS_COUNTER),
+            )
+            if pps > pps_count_last:
+                data.pps_count = pps
+                pps_count_last = pps
+    finally:
+        mqtt_client.loop_stop()
 
     logging.info("Exiting and resetting channels.")
     data.channels = ALL_CHANNELS
@@ -255,4 +291,3 @@ if __name__ == "__main__":
     parser.add_argument('--log-level', '-l', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
     args = parser.parse_args()
     main(args)
-
