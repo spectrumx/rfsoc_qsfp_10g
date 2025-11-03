@@ -69,6 +69,7 @@ setup(
         version='0.0.3',
         install_requires=[
             'pynq>=2.7',
+            'paho.mqtt>2.1',
             ],
         url='https://github.com/',
         license='BSD 3-Clause License',
