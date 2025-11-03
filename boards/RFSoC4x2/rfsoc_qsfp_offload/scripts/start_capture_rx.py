@@ -107,19 +107,14 @@ def on_message(client, userdata, msg):
     global data
     try:
     #   data = userdata
-      message = msg.payload.decode()
+      message = json.loads(msg.payload.decode())
       logging.debug(f"Received MQTT: {message}")
-      if not message.startswith("cmd "):
+      command = message.get("task_name", None)
+      if command is None:
           logging.warning("Invalid command format")
           return
 
-      parts = message[4:].split()
-      if not parts:
-          logging.warning("No command specified")
-          return
-
-      command = parts[0]
-      args = parts[1:]
+      args = message.get("arguments", "")  
 
       if command == "reset":
           set_channel_ctrl(Ctrl.RESET, data)
@@ -131,10 +126,7 @@ def on_message(client, userdata, msg):
           capture_next_pps(data)
           send_status(data)
       elif command == "set":
-          if len(args) != 2:
-            logging.warning("Invalid set command")
-            return
-          set_param, set_value = args
+          set_param, set_value = args.split(' ')
           if set_param == "freq_metadata":
             set_freq_metadata(set_value, data)
             send_status(data)
@@ -147,7 +139,7 @@ def on_message(client, userdata, msg):
             set_channel_ctrl(Ctrl.RESET, data)
             send_status(data)
           else:
-              logging.warning(f"Unknown set parameter: {set_param}")
+              logging.warning(f"Unknown set parameter: {set_param} value {set_value}")
       elif command == "get":
           if args and args[0] == "tlm":
               # data.mqtt_client.publish(MQTT_TLM_TOPIC, tlm_str)
@@ -227,12 +219,12 @@ def main(args):
 
 
     # Setup MQTT client
-    mqtt_client = mqtt.Client(userdata=data)
-    data.mqtt_client = mqtt_client
+    mqtt_client = mqtt.Client(client_id=service_name)
     mqtt_client.on_message = on_message
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.subscribe(MQTT_CMD_TOPIC)
     mqtt_client.loop_start()
+    data.mqtt_client = mqtt_client
 
     logging.info("Initializing RFSoC 10G Overlay")
     data.ol = Overlay(ignore_version=True)
