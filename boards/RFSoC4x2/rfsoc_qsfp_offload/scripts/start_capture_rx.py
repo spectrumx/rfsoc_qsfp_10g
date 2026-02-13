@@ -155,7 +155,7 @@ def set_sample_rate(sample_rate, data):
         getattr(data.ol, f'adc_to_udp_stream_{ch}').register_map.SAMPLE_RATE_NUMERATOR_LSB = sample_rate_raw
 
 def set_freq_metadata(f_c_hz, data):
-    data.f_c_hz = int(f_c_hz)
+    data.f_c_hz = int(float(f_c_hz))
     f_c_khz = data.f_c_hz / 1e3
     logging.info(f"Setting frequency metadata to: {f_c_khz} kHz")
     for ch in data.channels:
