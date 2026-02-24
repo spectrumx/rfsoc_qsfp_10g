@@ -63,7 +63,7 @@ def send_status(data):
         "channels": data.channels
     }
     if data.mqtt_client:
-        data.mqtt_client.publish(status_topic, json.dumps(status_payload))
+        data.mqtt_client.publish(status_topic, json.dumps(status_payload), retain=True)
 
 def signal_handler(sig, frame):
     global exit_flag
@@ -222,6 +222,7 @@ def main(args):
     mqtt_client = mqtt.Client(client_id=service_name)
     mqtt_client.on_message = on_message
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    mqtt_client.will_set(service_name + "/status", payload=json.dumps({"state": "offline"}), qos=0, retain=True)
     mqtt_client.subscribe(MQTT_CMD_TOPIC)
     mqtt_client.loop_start()
     data.mqtt_client = mqtt_client
