@@ -221,8 +221,8 @@ def main(args):
     # Setup MQTT client
     mqtt_client = mqtt.Client(client_id=service_name)
     mqtt_client.on_message = on_message
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.will_set(service_name + "/status", payload=json.dumps({"state": "offline"}), qos=0, retain=True)
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.subscribe(MQTT_CMD_TOPIC)
     mqtt_client.loop_start()
     data.mqtt_client = mqtt_client
