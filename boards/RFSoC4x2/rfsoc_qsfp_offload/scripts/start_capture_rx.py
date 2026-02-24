@@ -227,6 +227,8 @@ def main(args):
     mqtt_client.loop_start()
     data.mqtt_client = mqtt_client
 
+    mqtt_client.publish(service_name + "/status", payload=json.dumps({"state": "online"}), qos=0, retain=True)
+
     logging.info("Initializing RFSoC 10G Overlay")
     data.ol = Overlay(ignore_version=True)
     time.sleep(5)
