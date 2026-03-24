@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import time
 import signal
 import argparse
 import logging
 import json
+import fcntl
 import xrfdc
 import xrfclk
 import paho.mqtt.client as mqtt
@@ -18,6 +20,7 @@ MQTT_PORT = 1883
 MQTT_CMD_TOPIC = service_name + "/command"
 MQTT_TLM_TOPIC = "rfcapture/telemetry"
 LOG_DIR = '/var/log/spectrumx'
+LOCK_FILE = "/var/lock/" + service_name + ".lock"
 
 ADC_SAMPLE_FREQUENCY = 1024     # MSps
 ADC_DECIMATION = 16
@@ -285,4 +288,28 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--internal_clock', action='store_true', help='Use internal clock instead of external ref')
     parser.add_argument('--log-level', '-l', type=str, default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
     args = parser.parse_args()
+
+    try:
+        f = open(LOCK_FILE, "w")
+    except PermissionError:
+        print(f"Permission denied. Try running as root to write to {LOCK_FILE}")
+        sys.exit(1)
+
+    try:
+        # 2. Try to acquire an EXCLUSIVE lock (LOCK_EX) without blocking (LOCK_NB)
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        
+        # 3. Best Practice: Write the process PID into the file for debugging
+        f.write(str(os.getpid()))
+        f.flush()
+        
+    except BlockingIOError:
+        print("Another instance of this script is already running!")
+        sys.exit(1)
+
+    # --- Your actual script logic goes here ---
     main(args)
+
+    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    f.close()
+    os.remove(LOCK_FILE)
