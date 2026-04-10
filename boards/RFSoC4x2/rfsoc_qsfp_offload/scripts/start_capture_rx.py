@@ -137,7 +137,7 @@ def on_message(client, userdata, msg):
             update_adc_nco(set_value, data)
             send_status(data)
           elif set_param == "channel":
-            data.channels = [set_value]
+            data.channels = [ch for ch in set_value.split(",")]
             logging.info(f"Set active channels to: {data.channels}")
             set_channel_ctrl(Ctrl.RESET, data)
             send_status(data)
