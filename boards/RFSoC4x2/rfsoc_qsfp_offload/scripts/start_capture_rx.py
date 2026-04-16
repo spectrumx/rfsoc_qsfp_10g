@@ -101,6 +101,7 @@ def update_adc_nco(freq_mhz, data):
             adc_tile.blocks[block].UpdateEvent(xrfdc.EVENT_MIXER)
             adc_tile.SetupFIFO(True)
 
+        set_sample_rate((ADC_SAMPLE_FREQUENCY * 1e6) / ADC_DECIMATION, data)
         set_freq_metadata(freq_hz, data)
         logging.info(f"ADC mixer and metadata updated to {freq_mhz:.2f} MHz")
     except Exception as e:
@@ -248,7 +249,6 @@ def main(args):
 
     # Apply initial ADC config
     update_adc_nco(args.freq, data)
-    set_sample_rate((ADC_SAMPLE_FREQUENCY * 1e6) / ADC_DECIMATION, data)
 
     if not args.reset:
         if args.internal_clock:
